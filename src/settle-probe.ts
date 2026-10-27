@@ -1,10 +1,10 @@
-import { burdenOf, CLUB, participantsOf, settle } from "./settle.ts";
+import { burdenOf, participantsOf, settle } from "./settle.ts";
 import { normalize, removeMember, usageOf } from "./store.ts";
 import { ANNUAL, type Data, type Expense, type Member } from "./types.ts";
 
 const m = (id: string, grade: number, gender: Member["gender"]): Member => ({ id, name: id, grade, gender, status: "在籍" });
 const x = (id: string, eventId: string, category: Expense["category"], tripId: string | null, amount: number, payerId: string | null, burden: Expense["burden"] = { mode: "all" }): Expense => ({
-  id, eventId, category, tripId, date: "", title: "", amount, driverId: category === "雑費" ? null : payerId, payerId, burden, note: "",
+  id, eventId, category, tripId, title: "", amount, driverId: category === "雑費" ? null : payerId, payerId, burden, note: "",
 });
 const data: Data = {
   version: 2,
@@ -25,9 +25,10 @@ const data: Data = {
     x("1", "camp", "ガソリン", "t1", 3000, "C"),
     x("2", "camp", "高速", "t2", 3001, "D"),
     x("3", "camp", "雑費", null, 5000, "A"),
-    x("4", "camp", "雑費", null, 2000, null, { mode: "filter", grades: [1], genders: [] }),
+    x("4", "camp", "雑費", null, 2000, "E", { mode: "filter", grades: [1], genders: [] }),
     x("5", ANNUAL, "雑費", null, 1500, "D", { mode: "filter", grades: [], genders: ["男"] }),
-    x("6", "camp", "ガソリン", null, 500, null),
+    { ...x("6", "camp", "ガソリン", null, 500, "A"), driverId: null },
+    x("7", "camp", "雑費", null, 700, null),
   ],
   settled: {},
 };
@@ -41,23 +42,24 @@ const check = (label: string, ok: boolean) => {
 const camp = settle(data, ["camp"]);
 const owed = Object.fromEntries(camp.lines.map((l) => [l.member.id, l.owed]));
 // ①ガソリン3000：A,B,D（Cは運転）で1000ずつ / ②高速3001：A,B,C（D,Eは運転）で1001,1000,1000
-// 雑費5000：全員5人で1000ずつ / 1年のみ2000：A,Bで1000ずつ / 移動なしガソリン500：負担者なし
+// 雑費5000：全員5人で1000ずつ / 1年のみ2000：A,Bで1000ずつ / 運転者なしガソリン500・立て替えなし雑費700：精算に入れない
 check("①の運転手Cは①のガソリンを負担しない", owed.C === 1000 + 1000);
 check("①に乗っていないEはガソリン①を負担しない", owed.E === 1000);
 check("②の運転手D・Eは②の高速を負担しない", owed.D === 1000 + 1000);
 check("端数は名簿順に上乗せ", owed.A === 1000 + 1001 + 1000 + 1000 && owed.B === 1000 + 1000 + 1000 + 1000);
-check("移動未選択の交通費は警告", camp.warnings.length === 1 && camp.warnings[0].includes("移動が選ばれていません"));
-check("収支の合計がゼロ", camp.lines.reduce((s, l) => s + l.net, 0) + camp.clubNet === 0);
+check("運転者のない交通費・立て替えのない支出は警告", camp.warnings.length === 2 && camp.warnings[0].includes("運転した人が選ばれていません") && camp.warnings[1].includes("立て替えた人が選ばれていません"));
+check("警告の支出は精算に入れない", camp.excluded === 1200 && camp.lines.find((l) => l.member.id === "A")!.paid === 5000);
+check("収支の合計がゼロ", camp.lines.reduce((s, l) => s + l.net, 0) === 0);
 const moved = new Map<string, number>();
 for (const t of camp.transfers) {
   moved.set(t.from, (moved.get(t.from) ?? 0) - t.amount);
   moved.set(t.to, (moved.get(t.to) ?? 0) + t.amount);
 }
-check("送金で全員の収支が埋まる", camp.lines.every((l) => (moved.get(l.member.id) ?? 0) === l.net) && (moved.get(CLUB) ?? 0) === camp.clubNet);
+check("送金で全員の収支が埋まる", camp.lines.every((l) => (moved.get(l.member.id) ?? 0) === l.net) );
 
 const all = settle(data, data.events.map((e) => e.id));
 check("全期間：男子のみの雑費は男子3人で割る", all.lines.find((l) => l.member.id === "E")!.owed === 1000 + 500);
-check("全期間：収支の合計がゼロ", all.lines.reduce((s, l) => s + l.net, 0) + all.clubNet === 0);
+check("全期間：収支の合計がゼロ", all.lines.reduce((s, l) => s + l.net, 0) === 0);
 
 const old = normalize({
   members: data.members,
@@ -86,11 +88,11 @@ check("OBでも過去の会計の対象・運転はそのまま", settle(withOb,
 const removed = removeMember({ ...data, settled: { camp: ["C", "D"] } }, "C");
 check("削除：名簿から消える", !removed.members.some((p) => p.id === "C"));
 check("削除：対象・乗車・運転から外れる", !removed.events[1].participantIds.includes("C") && !removed.events[1].trips[0].riderIds.includes("C") && removed.events[1].trips[0].driverIds.length === 0);
-check("削除：立て替えた支出は部費払いになる", removed.expenses[0].payerId === null && removed.expenses.length === data.expenses.length);
+check("削除：立て替えた支出は立て替えた人が未選択になる", removed.expenses[0].payerId === null && removed.expenses.length === data.expenses.length);
 check("削除：精算済みからも外れる", removed.settled.camp.join() === "D");
 check("削除後も精算の合計は合う", (() => {
   const r = settle(removed, ["camp"]);
-  return r.lines.reduce((s, l) => s + l.net, 0) + r.clubNet === 0;
+  return r.lines.reduce((s, l) => s + l.net, 0) === 0;
 })());
 check("記録の数を数える", usageOf(data, "C").paid === 1 && usageOf(data, "C").other === 1 && usageOf(data, "B").paid === 0);
 

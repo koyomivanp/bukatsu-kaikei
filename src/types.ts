@@ -64,12 +64,11 @@ export type Expense = {
   category: Category;
   /** 高速・ガソリンのときの移動 */
   tripId: string | null;
-  date: string;
   title: string;
   amount: number;
   /** 高速・ガソリンのときの運転した人。その移動の高速・ガソリンの割り勘から外れる */
   driverId: string | null;
-  /** null は部費（会計）から支払い */
+  /** 立て替えた部員。null は未選択（精算に入らない） */
   payerId: string | null;
   /** 雑費のときだけ使う */
   burden: Burden;

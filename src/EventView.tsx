@@ -22,9 +22,9 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
   const [editing, setEditing] = useState<Expense | "new" | null>(null);
   const [showInactive, setShowInactive] = useState(false);
   const annual = event.id === ANNUAL;
-  const expenses = data.expenses.filter((x) => x.eventId === event.id).sort((a, b) => a.date.localeCompare(b.date));
+  const expenses = data.expenses.filter((x) => x.eventId === event.id);
   const result = settle(data, [event.id]);
-  const nameOf = (id: string | null) => (id ? (data.members.find((m) => m.id === id)?.name ?? "（削除済み）") : "部費");
+  const nameOf = (id: string | null) => (id ? (data.members.find((m) => m.id === id)?.name ?? "（削除済み）") : "未選択");
   const involved = new Set([...event.participantIds, ...event.trips.flatMap((t) => [...t.riderIds, ...t.driverIds])]);
   const rows = data.members.filter((m) => isActive(m) || involved.has(m.id) || showInactive);
   const inactive = data.members.filter((m) => !isActive(m)).length;
@@ -134,7 +134,8 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
                     title="この移動を削除"
                     onClick={() => {
                       const used = data.expenses.filter((x) => x.tripId === t.id).length;
-                      if (used > 0) return alert(`「${t.name}」には支出が${used}件あります。先に支出の移動を変えるか削除してください。`);
+                      if (used > 0) return alert(`「${t.name}」には支出が${used}件あります。先に支出の運転した人を変えるか削除してください。`);
+                      if (!annual && event.trips.length === 1) return alert("高速・ガソリンを割るのに使うので、最後の移動は消せません。");
                       patchEvent({ trips: event.trips.filter((x) => x.id !== t.id) });
                     }}
                   >
@@ -262,7 +263,6 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
         <table>
           <thead>
             <tr>
-              <th>日付</th>
               <th>費目</th>
               <th>内容</th>
               <th className="num">金額</th>
@@ -275,7 +275,6 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
           <tbody>
             {expenses.map((x) => (
               <tr key={x.id}>
-                <td>{x.date}</td>
                 <td>
                   <span className={`tag ${isTravel(x.category) ? "travel" : ""}`}>{x.category}</span>
                 </td>
@@ -310,7 +309,7 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
           </tbody>
           <tfoot>
             <tr>
-              <td colSpan={3}>合計</td>
+              <td colSpan={2}>合計</td>
               <td className="num">{yen(result.total)}</td>
               <td colSpan={4} />
             </tr>

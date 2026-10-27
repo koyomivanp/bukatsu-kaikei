@@ -1,15 +1,11 @@
 import { ANNUAL, isActive, isTravel, type ClubEvent, type Data, type Expense, type Member } from "./types.ts";
 
-/** 部費（会計）を精算の相手として表すID */
-export const CLUB = "club";
-
 export type Line = { member: Member; owed: number; paid: number; net: number };
 export type Transfer = { from: string; to: string; amount: number };
 export type Settlement = {
   total: number;
-  clubPaid: number;
-  /** 部費の収支。プラスなら部費に集める、マイナスなら部費から払う */
-  clubNet: number;
+  /** 立て替えた人・負担する人が決まらず、精算に入れていない金額 */
+  excluded: number;
   lines: Line[];
   transfers: Transfer[];
   warnings: string[];
@@ -58,8 +54,7 @@ export function settle(data: Data, eventIds: string[]): Settlement {
   const paid = new Map<string, number>();
   const add = (map: Map<string, number>, id: string, yen: number) => map.set(id, (map.get(id) ?? 0) + yen);
   let total = 0;
-  let clubPaid = 0;
-  let unassigned = 0;
+  let excluded = 0;
   const warnings: string[] = [];
 
   for (const id of eventIds) {
@@ -67,15 +62,20 @@ export function settle(data: Data, eventIds: string[]): Settlement {
     if (!event) continue;
     for (const expense of data.expenses.filter((x) => x.eventId === id)) {
       total += expense.amount;
-      if (expense.payerId) add(paid, expense.payerId, expense.amount);
-      else clubPaid += expense.amount;
       const who = burdenOf(data, event, expense);
-      if (who.length === 0) {
-        unassigned += expense.amount;
-        const why = isTravel(expense.category) && !event.trips.some((t) => t.id === expense.tripId) ? "移動が選ばれていません" : "負担する人がいません";
-        warnings.push(`「${labelOf(expense)}」（${event.name}）：${why}。部費の負担になります。`);
+      const why = !expense.payerId
+        ? "立て替えた人が選ばれていません"
+        : isTravel(expense.category) && !expense.driverId
+          ? "運転した人が選ばれていません"
+          : who.length === 0
+            ? "負担する人がいません"
+            : null;
+      if (why) {
+        excluded += expense.amount;
+        warnings.push(`「${labelOf(expense)}」${yen(expense.amount)}（${event.name}）：${why}。精算に入っていません。`);
         continue;
       }
+      add(paid, expense.payerId!, expense.amount);
       for (const [memberId, yen] of split(expense.amount, who)) add(owed, memberId, yen);
     }
   }
@@ -87,9 +87,7 @@ export function settle(data: Data, eventIds: string[]): Settlement {
       const p = paid.get(member.id) ?? 0;
       return { member, owed: o, paid: p, net: p - o };
     });
-  const clubNet = clubPaid - unassigned;
-  const parties = [...lines.map((l) => ({ id: l.member.id, net: l.net })), { id: CLUB, net: clubNet }];
-  return { total, clubPaid, clubNet, lines, transfers: transfersFor(parties), warnings };
+  return { total, excluded, lines, transfers: transfersFor(lines.map((l) => ({ id: l.member.id, net: l.net }))), warnings };
 }
 
 /** 払う人から受け取る人へ、なるべく少ない回数で済む送金の組み合わせ */

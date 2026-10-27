@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ANNUAL, type ClubEvent, type Data, type Expense, type Member } from "./types.ts";
+import { ANNUAL, type ClubEvent, type Data, type Expense, type Member, type Trip } from "./types.ts";
 
 const KEY = "bukatsu-kaikei:v1";
 
@@ -12,6 +12,11 @@ export function emptyData(): Data {
 type OldEvent = Partial<ClubEvent> & { driverIds?: string[] };
 type OldExpense = Partial<Expense> & { driverExempt?: boolean };
 type OldMember = Partial<Member> & { retired?: boolean };
+
+/** 会計を作ったときの移動。最初は対象の部員が全員乗っていることにする */
+export function defaultTrip(id: string, riderIds: string[]): Trip {
+  return { id, name: "移動", riderIds, driverIds: [] };
+}
 
 /** 読み込んだデータの欠けを補い、古い形式（運転手が会計ごとに1組、引退チェック）を今の形に直す。通年は常に先頭。 */
 export function normalize(raw: Partial<Omit<Data, "version">>): Data {
@@ -26,7 +31,9 @@ export function normalize(raw: Partial<Omit<Data, "version">>): Data {
     ...(m.faculty ? { faculty: m.faculty } : {}),
   }));
   const events: ClubEvent[] = (base.events as OldEvent[]).map((e) => {
-    const trips = e.trips ?? (e.driverIds?.length ? [{ id: `${e.id}-trip`, name: "移動", riderIds: e.participantIds ?? [], driverIds: e.driverIds }] : []);
+    let trips = e.trips ?? (e.driverIds?.length ? [{ id: `${e.id}-trip`, name: "移動", riderIds: e.participantIds ?? [], driverIds: e.driverIds }] : []);
+    // 通年以外の会計には、高速・ガソリン用の移動を必ず1つ置く
+    if (trips.length === 0 && e.id !== ANNUAL) trips = [defaultTrip(`${e.id}-trip`, e.participantIds ?? [])];
     return { id: e.id!, name: e.name ?? "", participantIds: e.participantIds ?? [], trips };
   });
   const expenses: Expense[] = (base.expenses as OldExpense[]).map((x) => {
@@ -39,7 +46,6 @@ export function normalize(raw: Partial<Omit<Data, "version">>): Data {
       eventId: x.eventId!,
       category: x.category ?? (travel ? "ガソリン" : "雑費"),
       tripId,
-      date: x.date ?? "",
       title: x.title ?? "",
       amount: x.amount ?? 0,
       driverId: x.driverId !== undefined ? x.driverId : travel && x.payerId && trip?.driverIds.includes(x.payerId) ? x.payerId : null,
@@ -63,7 +69,7 @@ export function usageOf(data: Data, id: string): { paid: number; other: number }
   return { paid, other: drove + picked + inEvents };
 }
 
-/** 部員を消し、記録からも外す。その人が立て替えた支出は「部費から支払い」になる。 */
+/** 部員を消し、記録からも外す。その人が立て替えた支出は「立て替えた人：未選択」になる。 */
 export function removeMember(data: Data, id: string): Data {
   const drop = (ids: string[]) => ids.filter((x) => x !== id);
   return {
@@ -113,9 +119,4 @@ export function useData(): [Data, Update, (data: Data) => void] {
 
 export function newId(): string {
   return crypto.randomUUID();
-}
-
-export function today(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }

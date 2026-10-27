@@ -31,7 +31,7 @@ export function Members({ data, update }: { data: Data; update: Update }) {
   const remove = (m: Member) => {
     const { paid, other } = usageOf(data, m.id);
     const lines = [`${m.name} を名簿から削除しますか？元に戻せません。`];
-    if (paid > 0) lines.push(`・${m.name} が立て替えた支出 ${paid}件は「部費から支払い」に変わります。`);
+    if (paid > 0) lines.push(`・${m.name} が立て替えた支出 ${paid}件は立て替えた人が未選択になり、選び直すまで精算に入りません。`);
     if (other > 0) lines.push(`・会計の対象・乗車・運転・個別指定から外れ、割り勘の金額が変わります。`);
     if (paid + other > 0) lines.push("", "記録を残したいだけなら、削除せず「OB」や「退部」にしてください。");
     if (confirm(lines.join("\n"))) update((d) => removeMember(d, m.id));

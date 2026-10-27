@@ -28,7 +28,6 @@ export function Summary({ data }: { data: Data }) {
             <tr>
               <th>会計</th>
               <th className="num">支出</th>
-              <th className="num">うち部費から</th>
             </tr>
           </thead>
           <tbody>
@@ -36,7 +35,6 @@ export function Summary({ data }: { data: Data }) {
               <tr key={event.id}>
                 <td>{event.name}</td>
                 <td className="num">{yen(result.total)}</td>
-                <td className="num">{yen(result.clubPaid)}</td>
               </tr>
             ))}
           </tbody>
@@ -44,7 +42,6 @@ export function Summary({ data }: { data: Data }) {
             <tr>
               <td>合計</td>
               <td className="num">{yen(all.total)}</td>
-              <td className="num">{yen(all.clubPaid)}</td>
             </tr>
           </tfoot>
         </table>

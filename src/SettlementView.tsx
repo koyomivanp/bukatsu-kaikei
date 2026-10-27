@@ -1,4 +1,4 @@
-import { CLUB, yen, type Settlement } from "./settle.ts";
+import { yen, type Settlement } from "./settle.ts";
 import type { Data } from "./types.ts";
 
 export function SettlementView({
@@ -14,7 +14,7 @@ export function SettlementView({
   settled?: string[];
   onToggleSettled?: (memberId: string) => void;
 }) {
-  const nameOf = (id: string) => (id === CLUB ? "部費（会計）" : (data.members.find((m) => m.id === id)?.name ?? "（削除済み）"));
+  const nameOf = (id: string) => data.members.find((m) => m.id === id)?.name ?? "（削除済み）";
 
   return (
     <div className="card">
@@ -51,17 +51,6 @@ export function SettlementView({
             </tr>
           ))}
         </tbody>
-        <tfoot>
-          <tr>
-            <td>部費（会計）</td>
-            <td className="num">—</td>
-            <td className="num">{yen(result.clubPaid)}</td>
-            <td className={`num ${result.clubNet > 0 ? "get" : result.clubNet < 0 ? "pay" : ""}`}>
-              {result.clubNet > 0 ? `${yen(result.clubNet)} 集める` : result.clubNet < 0 ? `${yen(-result.clubNet)} 払う` : "±0"}
-            </td>
-            {onToggleSettled && <td />}
-          </tr>
-        </tfoot>
       </table>
       <p className="hint">割り切れない端数は、名簿の順に1円ずつ上乗せしています。</p>
 

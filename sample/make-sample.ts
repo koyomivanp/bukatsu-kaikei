@@ -20,8 +20,8 @@ const id = (name: string) => members.find((m) => m.name.startsWith(name))!.id;
 const active = members.filter(isActive).map((m) => m.id);
 
 let n = 0;
-const ex = (eventId: string, category: Expense["category"], tripId: string | null, date: string, title: string, amount: number, payer: string | null, burden: Expense["burden"] = { mode: "all" }, note = ""): Expense => ({
-  id: `x${++n}`, eventId, category, tripId, date, title, amount, driverId: category !== "雑費" && payer ? id(payer) : null, payerId: payer ? id(payer) : null, burden, note,
+const ex = (eventId: string, category: Expense["category"], tripId: string | null, title: string, amount: number, payer: string | null, burden: Expense["burden"] = { mode: "all" }, note = ""): Expense => ({
+  id: `x${++n}`, eventId, category, tripId, title, amount, driverId: category !== "雑費" && payer ? id(payer) : null, payerId: payer ? id(payer) : null, burden, note,
 });
 const all = { mode: "all" } as const;
 
@@ -47,27 +47,27 @@ const data: Data = {
     },
   ],
   expenses: [
-    ex(ANNUAL, "雑費", null, "2026-04-10", "男子ユニフォーム", 15000, null, { mode: "filter", grades: [], genders: ["男"] }),
-    ex(ANNUAL, "雑費", null, "2026-04-20", "ボール・備品", 8000, "鈴木", all, "スポーツデポ"),
-    ex("summer", "ガソリン", "s1", "2026-08-01", "佐藤車", 4200, "佐藤"),
-    ex("summer", "ガソリン", "s1", "2026-08-01", "高橋車", 3800, "高橋"),
-    ex("summer", "高速", "s1", "2026-08-01", "", 5600, "佐藤"),
-    ex("summer", "雑費", null, "2026-08-02", "差し入れ", 12345, "田中", all, "イオン"),
-    ex("summer", "雑費", null, "2026-08-02", "1年の宿泊差額", 3000, null, { mode: "filter", grades: [1], genders: [] }),
-    ex("summer", "雑費", null, "2026-08-03", "女子部屋の追加布団", 2400, "渡辺", { mode: "filter", grades: [], genders: ["女"] }),
-    ex("summer", "高速", "s2", "2026-08-20", "", 3980, "鈴木"),
-    ex("summer", "ガソリン", "s2", "2026-08-20", "", 2710, "鈴木"),
-    ex("autumn", "ガソリン", "a1", "2026-10-12", "", 3000, "田中"),
-    ex("autumn", "高速", "a1", "2026-10-12", "", 2400, "伊藤"),
-    ex("autumn", "雑費", null, "2026-10-12", "大会参加費（3年のみ）", 6000, null, { mode: "filter", grades: [3], genders: [] }),
-    ex("autumn", "雑費", null, "2026-10-12", "先輩への差し入れ", 2000, "伊藤", { mode: "pick", memberIds: [id("山本"), id("中村"), id("小林"), id("加藤")] }),
+    ex(ANNUAL, "雑費", null, "男子ユニフォーム", 15000, "佐藤", { mode: "filter", grades: [], genders: ["男"] }),
+    ex(ANNUAL, "雑費", null, "ボール・備品", 8000, "鈴木", all, "スポーツデポ"),
+    ex("summer", "ガソリン", "s1", "佐藤車", 4200, "佐藤"),
+    ex("summer", "ガソリン", "s1", "高橋車", 3800, "高橋"),
+    ex("summer", "高速", "s1", "", 5600, "佐藤"),
+    ex("summer", "雑費", null, "差し入れ", 12345, "田中", all, "イオン"),
+    ex("summer", "雑費", null, "1年の宿泊差額", 3000, "高橋", { mode: "filter", grades: [1], genders: [] }),
+    ex("summer", "雑費", null, "女子部屋の追加布団", 2400, "渡辺", { mode: "filter", grades: [], genders: ["女"] }),
+    ex("summer", "高速", "s2", "", 3980, "鈴木"),
+    ex("summer", "ガソリン", "s2", "", 2710, "鈴木"),
+    ex("autumn", "ガソリン", "a1", "", 3000, "田中"),
+    ex("autumn", "高速", "a1", "", 2400, "伊藤"),
+    ex("autumn", "雑費", null, "大会参加費（3年のみ）", 6000, "佐藤", { mode: "filter", grades: [3], genders: [] }),
+    ex("autumn", "雑費", null, "先輩への差し入れ", 2000, "伊藤", { mode: "pick", memberIds: [id("山本"), id("中村"), id("小林"), id("加藤")] }),
   ],
   settled: {},
 };
 
 for (const e of data.events) {
   const r = settle(data, [e.id]);
-  const sum = r.lines.reduce((s, l) => s + l.net, 0) + r.clubNet;
+  const sum = r.lines.reduce((s, l) => s + l.net, 0);
   console.log(e.name, "支出", r.total, "収支合計", sum, "警告", r.warnings.length);
 }
 writeFileSync(new URL("./テストデータ.json", import.meta.url), JSON.stringify(data, null, 2));

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { yen } from "./settle.ts";
-import { newId, type Update } from "./store.ts";
+import { defaultTrip, newId, type Update } from "./store.ts";
 import { ANNUAL, isActive, type Data } from "./types.ts";
 
 export function EventList({ data, update, onOpen }: { data: Data; update: Update; onOpen: (id: string) => void }) {
@@ -18,13 +18,10 @@ export function EventList({ data, update, onOpen }: { data: Data; update: Update
           ev.preventDefault();
           if (!name.trim()) return;
           const id = newId();
-          update((d) => ({
-            ...d,
-            events: [
-              ...d.events,
-              { id, name: name.trim(), participantIds: d.members.filter(isActive).map((m) => m.id), trips: [] },
-            ],
-          }));
+          update((d) => {
+            const participantIds = d.members.filter(isActive).map((m) => m.id);
+            return { ...d, events: [...d.events, { id, name: name.trim(), participantIds, trips: [defaultTrip(newId(), participantIds)] }] };
+          });
           setName("");
           onOpen(id);
         }}
