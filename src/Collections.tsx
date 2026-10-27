@@ -68,7 +68,7 @@ function CollectionForm({
         <legend>{kind === "集金" ? "払った人" : "返してもらった人"}</legend>
         <div className="row">
           <button type="button" className="small" onClick={() => setMemberIds(people.map((m) => m.id))}>
-            対象者全員
+            参加者全員
           </button>
           <button type="button" className="small" onClick={() => setMemberIds([])}>
             全部外す

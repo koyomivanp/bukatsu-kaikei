@@ -100,7 +100,7 @@ export function RosterImport({ data, update }: { data: Data; update: Update }) {
                               key={g}
                               type="button"
                               className={(genders[i] ?? "未設定") === g ? "on" : ""}
-                              onClick={() => setGenders({ ...genders, [i]: g })}
+                              onClick={() => setGenders((prev) => ({ ...prev, [i]: g }))}
                             >
                               {g}
                             </button>
@@ -137,7 +137,7 @@ export function RosterImport({ data, update }: { data: Data; update: Update }) {
             <p className="hint">いません。</p>
           ) : (
             <>
-              <p className="hint">卒業・引退した人は「OB」、やめた人は「退部」に。どちらも新しい会計の対象から外れますが、過去の会計の記録は残ります。</p>
+              <p className="hint">卒業・引退した人は「OB」、やめた人は「退部」に。どちらも新しい会計の参加者には入りませんが、過去の会計の記録は残ります。</p>
               <table>
                 <tbody>
                   {plan.missing.map((m) => {
@@ -153,7 +153,7 @@ export function RosterImport({ data, update }: { data: Data; update: Update }) {
                                 key={c}
                                 type="button"
                                 className={choice === c ? "on" : ""}
-                                onClick={() => setMissingChoices({ ...missingChoices, [m.id]: c })}
+                                onClick={() => setMissingChoices((prev) => ({ ...prev, [m.id]: c }))}
                               >
                                 {c === "そのまま" ? "在籍のまま" : c}
                               </button>

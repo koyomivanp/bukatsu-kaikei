@@ -2,7 +2,7 @@ import { useState } from "react";
 import { burdenOf, participantsOf, split, yen } from "./settle.ts";
 import { MemberOptions } from "./MemberOptions.tsx";
 import { newId } from "./store.ts";
-import { CATEGORIES, FILTER_GENDERS, isActive, isTravel, type Burden, type Category, type ClubEvent, type Data, type Expense, type Gender } from "./types.ts";
+import { ANNUAL, CATEGORIES, FILTER_GENDERS, isActive, isTravel, type Burden, type Category, type ClubEvent, type Data, type Expense, type Gender } from "./types.ts";
 
 const travelInitial = (initial: Expense | null) => initial !== null && isTravel(initial.category);
 
@@ -149,7 +149,7 @@ export function ExpenseForm({
           <div className="row">
             {(
               [
-                ["all", "部員全員"],
+                ["all", event.id === ANNUAL ? "部員全員（在籍中）" : "イベント参加者"],
                 ["filter", "学年・性別で絞る"],
                 ["pick", "個別に選ぶ"],
               ] as const

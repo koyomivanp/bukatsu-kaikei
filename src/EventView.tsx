@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Collections } from "./Collections.tsx";
 import { ExpenseForm } from "./ExpenseForm.tsx";
+import { PeoplePanel } from "./PeoplePanel.tsx";
 import { autoMatch, receiptLabel, receiptsOf } from "./receipts.ts";
 import { Receipts } from "./Receipts.tsx";
 import { SettlementView } from "./SettlementView.tsx";
 import { burdenOf, settle, yen } from "./settle.ts";
-import { newId, type Update } from "./store.ts";
-import { ANNUAL, isActive, isDefaultParticipant, isTravel, type Burden, type ClubEvent, type Data, type Expense, type Receipt, type Trip } from "./types.ts";
+import type { Update } from "./store.ts";
+import { ANNUAL, isTravel, type Burden, type ClubEvent, type Data, type Expense, type Receipt, type Trip } from "./types.ts";
 
 function burdenLabel(expense: Expense, event: ClubEvent): string {
   if (isTravel(expense.category)) {
@@ -14,7 +15,7 @@ function burdenLabel(expense: Expense, event: ClubEvent): string {
     return trip ? `${trip.name}に乗った人（運転手除く）` : "（移動が未選択）";
   }
   const burden: Burden = expense.burden;
-  if (burden.mode === "all") return "部員全員";
+  if (burden.mode === "all") return event.id === ANNUAL ? "部員全員（在籍中）" : "イベント参加者";
   if (burden.mode === "pick") return "個別指定";
   return [burden.grades.map((g) => `${g}年`).join("・"), burden.genders.join("・")].filter(Boolean).join(" / ") + "のみ";
 }
@@ -35,19 +36,13 @@ const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter(
 
 export function EventView({ data, update, event, onBack }: { data: Data; update: Update; event: ClubEvent; onBack: () => void }) {
   const [editing, setEditing] = useState<Expense | "new" | null>(null);
-  const [showInactive, setShowInactive] = useState(false);
   const annual = event.id === ANNUAL;
   const expenses = data.expenses.filter((x) => x.eventId === event.id);
   const result = settle(data, [event.id]);
   const nameOf = (id: string | null) => (id ? (data.members.find((m) => m.id === id)?.name ?? "（削除済み）") : "未選択");
-  const involved = new Set([...event.participantIds, ...event.trips.flatMap((t) => [...t.riderIds, ...t.driverIds])]);
-  const rows = data.members.filter((m) => isActive(m) || involved.has(m.id) || showInactive);
-  const inactive = data.members.filter((m) => !isActive(m)).length;
 
   const patchEvent = (patch: Partial<ClubEvent>) =>
     update((d) => ({ ...d, events: d.events.map((e) => (e.id === event.id ? { ...e, ...patch } : e)) }));
-  const patchTrip = (tripId: string, patch: Partial<Trip>) =>
-    patchEvent({ trips: event.trips.map((t) => (t.id === tripId ? { ...t, ...patch } : t)) });
 
   const saveExpense = (expense: Expense) => {
     const driver = expense.driverId;
@@ -111,155 +106,7 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
       {annual ? (
         <p className="hint">通年の雑費は、在籍中の部員全員で割ります。</p>
       ) : (
-        <div className="card">
-          <div className="row spread">
-            <h3>部員と移動</h3>
-            <button
-              type="button"
-              className="no-print"
-              onClick={() =>
-                patchEvent({
-                  trips: [
-                    ...event.trips,
-                    { id: newId(), name: `移動${"①②③④⑤⑥⑦⑧⑨"[event.trips.length] ?? event.trips.length + 1}`, riderIds: [], driverIds: [] },
-                  ],
-                })
-              }
-            >
-              ＋ 移動（車）を追加
-            </button>
-          </div>
-          <p className="hint no-print">
-            雑費は「対象」の部員全員で割ります（4年生以上は最初はチェックなし。参加する人だけチェックしてください）。
-            高速・ガソリンは、移動ごとに「乗った人」から運転手を除いた人数で割ります。
-          </p>
-          <table className="people">
-            <thead>
-              <tr>
-                <th rowSpan={2}>名前</th>
-                <th rowSpan={2}>学年</th>
-                <th rowSpan={2}>性別</th>
-                <th rowSpan={2}>対象</th>
-                {event.trips.map((t) => (
-                  <th key={t.id} colSpan={2} className="trip-head">
-                    <input className="no-print" value={t.name} onChange={(e) => patchTrip(t.id, { name: e.target.value })} />
-                    <span className="print-only">{t.name}</span>
-                    <button
-                      type="button"
-                      className="danger small no-print"
-                      title="この移動を削除"
-                      onClick={() => {
-                        const used = data.expenses.filter((x) => x.tripId === t.id).length;
-                        if (used > 0) return alert(`「${t.name}」には支出が${used}件あります。先に支出の運転した人を変えるか削除してください。`);
-                        if (event.trips.length === 1) return alert("高速・ガソリンを割るのに使うので、最後の移動は消せません。");
-                        patchEvent({ trips: event.trips.filter((x) => x.id !== t.id) });
-                      }}
-                    >
-                      ×
-                    </button>
-                  </th>
-                ))}
-              </tr>
-              <tr>
-                {event.trips.map((t) => [
-                  <th key={`${t.id}-r`}>乗車</th>,
-                  <th key={`${t.id}-d`}>運転</th>,
-                ])}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((m) => {
-                const target = event.participantIds.includes(m.id);
-                return (
-                  <tr key={m.id} className={target ? "" : "muted"}>
-                    <td>
-                      {m.name}
-                      {!isActive(m) && <span className="tag">{m.status}</span>}
-                    </td>
-                    <td>{m.grade}年</td>
-                    <td>{m.gender}</td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={target}
-                        onChange={() => patchEvent({ participantIds: toggle(event.participantIds, m.id) })}
-                      />
-                    </td>
-                    {event.trips.map((t) => {
-                      const rides = t.riderIds.includes(m.id);
-                      return [
-                        <td key={`${t.id}-r`} className="trip-cell">
-                          <input
-                            type="checkbox"
-                            checked={rides}
-                            onChange={() =>
-                              patchTrip(t.id, {
-                                riderIds: toggle(t.riderIds, m.id),
-                                driverIds: rides ? t.driverIds.filter((x) => x !== m.id) : t.driverIds,
-                              })
-                            }
-                          />
-                        </td>,
-                        <td key={`${t.id}-d`}>
-                          <input
-                            type="checkbox"
-                            disabled={!rides}
-                            checked={t.driverIds.includes(m.id)}
-                            onChange={() => patchTrip(t.id, { driverIds: toggle(t.driverIds, m.id) })}
-                          />
-                        </td>,
-                      ];
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot className="no-print">
-              <tr>
-                <td colSpan={3}>まとめて</td>
-                <td>
-                  <div className="row">
-                    <button type="button" className="small" onClick={() => patchEvent({ participantIds: data.members.filter(isDefaultParticipant).map((m) => m.id) })}>
-                      1〜3年
-                    </button>
-                    <button type="button" className="small" onClick={() => patchEvent({ participantIds: data.members.filter(isActive).map((m) => m.id) })}>
-                      全員
-                    </button>
-                  </div>
-                </td>
-                {event.trips.map((t) => (
-                  <td key={t.id} colSpan={2}>
-                    <button
-                      type="button"
-                      className="small"
-                      onClick={() =>
-                        patchTrip(t.id, {
-                          riderIds: event.participantIds,
-                        })
-                      }
-                    >
-                      対象者を全員乗せる
-                    </button>
-                  </td>
-                ))}
-              </tr>
-            </tfoot>
-          </table>
-          {event.trips.length > 0 && (
-            <p className="hint">
-              {event.trips
-                .map((t) => `${t.name}：乗車 ${t.riderIds.length}人・運転 ${t.driverIds.length}人 → 高速・ガソリンは ${t.riderIds.length - t.driverIds.length}人で割る`)
-                .join("　/　")}
-            </p>
-          )}
-          {inactive > 0 && (
-            <label className="check no-print">
-              <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
-              退部・OBの人も表示する（OBが合宿に来たときなど）
-            </label>
-          )}
-          {data.members.length === 0 && <p className="empty">先に「名簿」タブで部員を登録してください。</p>}
-        </div>
+        <PeoplePanel data={data} update={update} event={event} />
       )}
 
       <div className="card">
