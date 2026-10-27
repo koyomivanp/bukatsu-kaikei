@@ -472,3 +472,42 @@ details.card > summary {
 details.card[open] > summary {
   margin-bottom: 12px;
 }
+
+.file-button {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+.file-button.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.file-button input {
+  display: none;
+}
+
+details.api-key {
+  margin: 8px 0 12px;
+}
+
+details.api-key input {
+  width: min(420px, 100%);
+}
+
+tr.unmatched td {
+  background: var(--warn-bg);
+}
+
+input.amount {
+  width: 7em;
+  text-align: right;
+}
+
+.receipt-note .mismatch {
+  color: var(--pay);
+}

@@ -14,6 +14,7 @@ export function SettlementView({
   settled?: string[];
   onToggleSettled?: (memberId: string) => void;
 }) {
+  const hasCollections = result.lines.some((l) => l.collected !== 0);
   const nameOf = (id: string) => data.members.find((m) => m.id === id)?.name ?? "（削除済み）";
 
   return (
@@ -30,6 +31,7 @@ export function SettlementView({
             <th>名前</th>
             <th className="num">負担額</th>
             <th className="num">立て替え</th>
+            {hasCollections && <th className="num">集金・返金</th>}
             <th className="num">差し引き</th>
             {onToggleSettled && <th>精算済み</th>}
           </tr>
@@ -40,6 +42,7 @@ export function SettlementView({
               <td>{l.member.name}</td>
               <td className="num">{yen(l.owed)}</td>
               <td className="num">{yen(l.paid)}</td>
+              {hasCollections && <td className="num">{l.collected === 0 ? "—" : l.collected > 0 ? `${yen(l.collected)} 払済` : `${yen(-l.collected)} 預かり`}</td>}
               <td className={`num ${l.net < 0 ? "pay" : l.net > 0 ? "get" : ""}`}>
                 {l.net < 0 ? `${yen(-l.net)} 払う` : l.net > 0 ? `${yen(l.net)} 受け取る` : "±0"}
               </td>
@@ -52,7 +55,10 @@ export function SettlementView({
           ))}
         </tbody>
       </table>
-      <p className="hint">割り切れない端数は、名簿の順に1円ずつ上乗せしています。</p>
+      <p className="hint">
+        割り切れない端数は、名簿の順に1円ずつ上乗せしています。
+        {hasCollections && "「集金・返金」は、集金で払った分を「払済」、集めたお金を持っている分（返金した分を除く）を「預かり」としています。"}
+      </p>
 
       {result.transfers.length > 0 && (
         <>

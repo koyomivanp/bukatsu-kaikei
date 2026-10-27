@@ -11,7 +11,7 @@ type Tab = "events" | "members" | "summary" | "backup";
 const TABS: { id: Tab; label: string }[] = [
   { id: "events", label: "会計" },
   { id: "members", label: "名簿" },
-  { id: "summary", label: "全期間の集計" },
+  { id: "summary", label: "まとめて集計" },
   { id: "backup", label: "バックアップ" },
 ];
 

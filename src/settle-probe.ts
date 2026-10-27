@@ -1,6 +1,7 @@
 import { burdenOf, participantsOf, settle } from "./settle.ts";
 import { normalize, removeMember, usageOf } from "./store.ts";
-import { ANNUAL, type Data, type Expense, type Member } from "./types.ts";
+import { autoMatch } from "./receipts.ts";
+import { ANNUAL, isDefaultParticipant, type Data, type Expense, type Member, type Receipt } from "./types.ts";
 
 const m = (id: string, grade: number, gender: Member["gender"]): Member => ({ id, name: id, grade, gender, status: "在籍" });
 const x = (id: string, eventId: string, category: Expense["category"], tripId: string | null, amount: number, payerId: string | null, burden: Expense["burden"] = { mode: "all" }): Expense => ({
@@ -30,6 +31,8 @@ const data: Data = {
     { ...x("6", "camp", "ガソリン", null, 500, "A"), driverId: null },
     x("7", "camp", "雑費", null, 700, null),
   ],
+  receipts: [],
+  collections: [],
   settled: {},
 };
 
@@ -95,5 +98,37 @@ check("削除後も精算の合計は合う", (() => {
   return r.lines.reduce((s, l) => s + l.net, 0) === 0;
 })());
 check("記録の数を数える", usageOf(data, "C").paid === 1 && usageOf(data, "C").other === 1 && usageOf(data, "B").paid === 0);
+
+// レシートの照合：金額が同じで、まだレシートのない支出に1対1で決まるものだけ結びつける
+const r = (id: string, amount: number | null, eventId = "camp"): Receipt => ({ id, eventId, fileName: `${id}.jpg`, fileSize: 1, store: "", date: "", amount, summary: "", expenseId: null });
+const matched = autoMatch({ ...data, receipts: [r("r1", 3000), r("r2", 3001), r("r3", 3001), r("r4", 5000, ANNUAL), r("r5", null), r("r6", 9999)] }, "camp");
+const linkOf = (id: string) => matched.receipts.find((x) => x.id === id)!.expenseId;
+check("レシート：金額が1つだけ一致すれば結びつく", linkOf("r1") === "1");
+check("レシート：同じ金額のレシートが2枚あれば決めない", linkOf("r2") === null && linkOf("r3") === null);
+check("レシート：ほかの会計のレシートは結びつけない", linkOf("r4") === null);
+check("レシート：金額が読めない・一致しないものはそのまま", linkOf("r5") === null && linkOf("r6") === null);
+check("レシート：結びついた支出には二重に結びつけない", autoMatch({ ...matched, receipts: [...matched.receipts, r("r7", 3000)] }, "camp").receipts.at(-1)!.expenseId === null);
+
+check("4年生以上は会計の対象に最初は入らない", isDefaultParticipant(m("F", 3, "男")) && !isDefaultParticipant(m("G", 4, "男")) && !isDefaultParticipant({ ...m("H", 2, "女"), status: "OB" }));
+const oldGender = normalize({ members: [{ ...m("I", 1, "男"), gender: "その他" }] as never, expenses: [{ ...x("8", "camp", "雑費", null, 100, "I"), burden: { mode: "filter", grades: [], genders: ["男", "その他"] } }] as never });
+check("旧データ：性別「その他」は未設定に戻す", oldGender.members[0].gender === "未設定" && (oldGender.expenses[0].burden as { genders: string[] }).genders.join() === "男");
+
+// 集金・返金：A が全員から1000ずつ集め、B に200返した
+const withCollect: Data = {
+  ...data,
+  collections: [
+    { id: "c1", eventId: "camp", kind: "集金", holderId: "A", perPerson: 1000, memberIds: ["A", "B", "C", "D", "E"], note: "" },
+    { id: "c2", eventId: "camp", kind: "返金", holderId: "A", perPerson: 200, memberIds: ["B"], note: "" },
+    { id: "c3", eventId: "camp", kind: "集金", holderId: null, perPerson: 500, memberIds: ["C"], note: "" },
+  ],
+};
+const col = settle(withCollect, ["camp"]);
+const netOf = (r: typeof col, id: string) => r.lines.find((l) => l.member.id === id)!.net;
+check("集金：払った人は精算でその分だけ受け取る側に寄る", netOf(col, "C") === netOf(camp, "C") + 1000 && netOf(col, "B") === netOf(camp, "B") + 1000 - 200);
+check("集金：預かった人は預かった分（返金を除く）を返す側に寄る", netOf(col, "A") === netOf(camp, "A") + 1000 - 5000 + 200);
+check("集金：収支の合計はゼロのまま", col.lines.reduce((s, l) => s + l.net, 0) === 0);
+check("集金：預かる人のない集金は警告して入れない", col.warnings.some((w) => w.includes("預かる人が選ばれていません")) && col.lines.find((l) => l.member.id === "C")!.collected === 1000);
+check("集金：ほかの会計の精算には入らない", settle(withCollect, [ANNUAL]).lines.every((l) => l.collected === 0));
+check("削除：集金の預かる人を消すと未選択になる", removeMember(withCollect, "A").collections[0].holderId === null);
 
 if (failed > 0) throw new Error(`${failed}件の確認に失敗`);

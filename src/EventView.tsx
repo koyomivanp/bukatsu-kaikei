@@ -1,9 +1,12 @@
 import { useState } from "react";
+import { Collections } from "./Collections.tsx";
 import { ExpenseForm } from "./ExpenseForm.tsx";
+import { autoMatch, receiptLabel, receiptsOf } from "./receipts.ts";
+import { Receipts } from "./Receipts.tsx";
 import { SettlementView } from "./SettlementView.tsx";
 import { burdenOf, settle, yen } from "./settle.ts";
 import { newId, type Update } from "./store.ts";
-import { ANNUAL, isActive, isTravel, type Burden, type ClubEvent, type Data, type Expense, type Trip } from "./types.ts";
+import { ANNUAL, isActive, isDefaultParticipant, isTravel, type Burden, type ClubEvent, type Data, type Expense, type Receipt, type Trip } from "./types.ts";
 
 function burdenLabel(expense: Expense, event: ClubEvent): string {
   if (isTravel(expense.category)) {
@@ -14,6 +17,18 @@ function burdenLabel(expense: Expense, event: ClubEvent): string {
   if (burden.mode === "all") return "部員全員";
   if (burden.mode === "pick") return "個別指定";
   return [burden.grades.map((g) => `${g}年`).join("・"), burden.genders.join("・")].filter(Boolean).join(" / ") + "のみ";
+}
+
+/** 支出についたレシート。合計が支出の金額と違えば知らせる */
+function ReceiptNote({ receipts, amount }: { receipts: Receipt[]; amount: number }) {
+  if (receipts.length === 0) return null;
+  const sum = receipts.reduce((s, r) => s + (r.amount ?? 0), 0);
+  return (
+    <div className="hint receipt-note">
+      レシート：{receipts.map((r) => `${receiptLabel(r)} ${r.amount === null ? "" : yen(r.amount)}`).join("、")}
+      {sum !== amount && <span className="mismatch">（レシート合計 {yen(sum)} と金額が違います）</span>}
+    </div>
+  );
 }
 
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
@@ -36,25 +51,21 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
 
   const saveExpense = (expense: Expense) => {
     const driver = expense.driverId;
-    update((d) => ({
-      ...d,
-      // 運転した人は、その移動の乗車・運転手にも入れる
-      events: d.events.map((e) =>
-        e.id !== event.id || !driver
-          ? e
-          : {
-              ...e,
-              trips: e.trips.map((t) =>
-                t.id !== expense.tripId || t.driverIds.includes(driver)
-                  ? t
-                  : { ...t, riderIds: t.riderIds.includes(driver) ? t.riderIds : [...t.riderIds, driver], driverIds: [...t.driverIds, driver] },
-              ),
-            },
+    // 運転した人は、その移動の乗車・運転手にも入れる
+    const withDriver = (t: Trip): Trip =>
+      !driver || t.id !== expense.tripId || t.driverIds.includes(driver)
+        ? t
+        : { ...t, riderIds: t.riderIds.includes(driver) ? t.riderIds : [...t.riderIds, driver], driverIds: [...t.driverIds, driver] };
+    update((d) =>
+      autoMatch(
+        {
+          ...d,
+          events: d.events.map((e) => (e.id === event.id ? { ...e, trips: e.trips.map(withDriver) } : e)),
+          expenses: d.expenses.some((x) => x.id === expense.id) ? d.expenses.map((x) => (x.id === expense.id ? expense : x)) : [...d.expenses, expense],
+        },
+        event.id,
       ),
-      expenses: d.expenses.some((x) => x.id === expense.id)
-        ? d.expenses.map((x) => (x.id === expense.id ? expense : x))
-        : [...d.expenses, expense],
-    }));
+    );
     setEditing(null);
   };
 
@@ -76,10 +87,12 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
               type="button"
               className="danger"
               onClick={() => {
-                if (!confirm(`「${event.name}」と、その支出 ${expenses.length}件を削除しますか？`)) return;
+                if (!confirm(`「${event.name}」と、その支出 ${expenses.length}件・レシート ${data.receipts.filter((r) => r.eventId === event.id).length}枚を削除しますか？`)) return;
                 update((d) => ({
                   ...d,
                   events: d.events.filter((e) => e.id !== event.id),
+                  receipts: d.receipts.filter((r) => r.eventId !== event.id),
+                  collections: d.collections.filter((c) => c.eventId !== event.id),
                   expenses: d.expenses.filter((x) => x.eventId !== event.id),
                 }));
                 onBack();
@@ -114,7 +127,7 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
           </button>
         </div>
         <p className="hint no-print">
-          {annual ? "雑費は在籍中の部員全員で割ります。" : "雑費は「対象」の部員全員で割ります。"}
+          {annual ? "雑費は在籍中の部員全員で割ります。" : "雑費は「対象」の部員全員で割ります（4年生以上は最初はチェックなし。参加する人だけチェックしてください）。"}
           高速・ガソリンは、移動ごとに「乗った人」から運転手を除いた人数で割ります。
         </p>
         <table className="people">
@@ -204,9 +217,14 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
               <td colSpan={3}>まとめて</td>
               <td>
                 {!annual && (
-                  <button type="button" className="small" onClick={() => patchEvent({ participantIds: data.members.filter(isActive).map((m) => m.id) })}>
-                    全員
-                  </button>
+                  <div className="row">
+                    <button type="button" className="small" onClick={() => patchEvent({ participantIds: data.members.filter(isDefaultParticipant).map((m) => m.id) })}>
+                      1〜3年
+                    </button>
+                    <button type="button" className="small" onClick={() => patchEvent({ participantIds: data.members.filter(isActive).map((m) => m.id) })}>
+                      全員
+                    </button>
+                  </div>
                 )}
               </td>
               {event.trips.map((t) => (
@@ -281,6 +299,7 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
                 <td>
                   {x.title}
                   {x.note && <div className="hint">{x.note}</div>}
+                  <ReceiptNote receipts={receiptsOf(data, x)} amount={x.amount} />
                 </td>
                 <td className="num">{yen(x.amount)}</td>
                 <td>
@@ -298,7 +317,11 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
                     className="danger"
                     onClick={() => {
                       if (confirm(`${yen(x.amount)} の「${x.title || x.category}」を削除しますか？`))
-                        update((d) => ({ ...d, expenses: d.expenses.filter((y) => y.id !== x.id) }));
+                        update((d) => ({
+                          ...d,
+                          expenses: d.expenses.filter((y) => y.id !== x.id),
+                          receipts: d.receipts.map((r) => (r.expenseId === x.id ? { ...r, expenseId: null } : r)),
+                        }));
                     }}
                   >
                     削除
@@ -317,6 +340,10 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
         </table>
         {expenses.length === 0 && <p className="empty">まだ支出がありません。</p>}
       </div>
+
+      <Collections data={data} update={update} event={event} />
+
+      <Receipts data={data} update={update} event={event} />
 
       <SettlementView
         data={data}

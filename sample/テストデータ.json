@@ -61,7 +61,7 @@
       "id": "m9",
       "name": "小林 蒼",
       "grade": 1,
-      "gender": "その他",
+      "gender": "男",
       "status": "在籍"
     },
     {
@@ -397,6 +397,40 @@
         ]
       },
       "note": ""
+    }
+  ],
+  "receipts": [],
+  "collections": [
+    {
+      "id": "c1",
+      "eventId": "summer",
+      "kind": "集金",
+      "holderId": "m2",
+      "perPerson": 3000,
+      "memberIds": [
+        "m1",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "m6",
+        "m7",
+        "m8",
+        "m9",
+        "m10"
+      ],
+      "note": "合宿費の前払い"
+    },
+    {
+      "id": "c2",
+      "eventId": "summer",
+      "kind": "返金",
+      "holderId": "m2",
+      "perPerson": 500,
+      "memberIds": [
+        "m10"
+      ],
+      "note": "途中参加の差額"
     }
   ],
   "settled": {}

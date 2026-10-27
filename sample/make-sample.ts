@@ -11,7 +11,7 @@ const roster: [string, number, Member["gender"], Member["status"]?][] = [
   ["渡辺 さくら", 2, "女"],
   ["山本 湊", 1, "男"],
   ["中村 ひなた", 1, "女"],
-  ["小林 蒼", 1, "その他"],
+  ["小林 蒼", 1, "男"],
   ["加藤 陽菜", 1, "女"],
   ["吉田 拓海", 3, "男", "退部"],
 ];
@@ -61,6 +61,11 @@ const data: Data = {
     ex("autumn", "高速", "a1", "", 2400, "伊藤"),
     ex("autumn", "雑費", null, "大会参加費（3年のみ）", 6000, "佐藤", { mode: "filter", grades: [3], genders: [] }),
     ex("autumn", "雑費", null, "先輩への差し入れ", 2000, "伊藤", { mode: "pick", memberIds: [id("山本"), id("中村"), id("小林"), id("加藤")] }),
+  ],
+  receipts: [],
+  collections: [
+    { id: "c1", eventId: "summer", kind: "集金", holderId: id("鈴木"), perPerson: 3000, memberIds: active, note: "合宿費の前払い" },
+    { id: "c2", eventId: "summer", kind: "返金", holderId: id("鈴木"), perPerson: 500, memberIds: [id("加藤")], note: "途中参加の差額" },
   ],
   settled: {},
 };

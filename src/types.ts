@@ -1,8 +1,8 @@
-export type Gender = "男" | "女" | "その他" | "未設定";
+export type Gender = "男" | "女" | "未設定";
 
-export const GENDERS: Gender[] = ["男", "女", "その他", "未設定"];
+export const GENDERS: Gender[] = ["男", "女", "未設定"];
 /** 「男子のみ」などの絞り込みに使う性別 */
-export const FILTER_GENDERS: Gender[] = ["男", "女", "その他"];
+export const FILTER_GENDERS: Gender[] = ["男", "女"];
 export const GRADES = [1, 2, 3, 4, 5, 6];
 
 /** 退部・OB の人は新しい会計の対象に入らないが、過去の記録には残る */
@@ -11,6 +11,11 @@ export const STATUSES: Status[] = ["在籍", "退部", "OB"];
 
 export function isActive(member: Member): boolean {
   return member.status === "在籍";
+}
+
+/** 4年生以上は基本参加しないので、会計を作ったときは対象に入れない（あとで個別にチェックする） */
+export function isDefaultParticipant(member: Member): boolean {
+  return isActive(member) && member.grade <= 3;
 }
 
 export type Member = {
@@ -75,11 +80,44 @@ export type Expense = {
   note: string;
 };
 
+/** AIで読み取ったレシート1枚。画像そのものは保存せず、読み取った内容だけ残す */
+export type Receipt = {
+  id: string;
+  eventId: string;
+  fileName: string;
+  fileSize: number;
+  store: string;
+  /** レシートに書かれた日付（YYYY-MM-DD）。読めなければ空 */
+  date: string;
+  /** 合計金額。読めなければ null */
+  amount: number | null;
+  summary: string;
+  /** 結びついた支出。1つの支出に複数のレシートがつくこともある */
+  expenseId: string | null;
+};
+
+/**
+ * 事前の集金と返金。集金は対象の部員から預かる人へ、返金は預かる人から対象の部員へのお金の受け渡し。
+ * 精算に入るので、集めすぎた分は精算で預かる人から返す形になる。
+ */
+export type Collection = {
+  id: string;
+  eventId: string;
+  kind: "集金" | "返金";
+  /** お金を預かっている部員（会計など） */
+  holderId: string | null;
+  perPerson: number;
+  memberIds: string[];
+  note: string;
+};
+
 export type Data = {
   version: 2;
   members: Member[];
   events: ClubEvent[];
   expenses: Expense[];
+  receipts: Receipt[];
+  collections: Collection[];
   /** 会計ID → 精算済みの部員ID */
   settled: Record<string, string[]>;
 };

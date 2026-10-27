@@ -1,6 +1,7 @@
 import { ANNUAL, isActive, isTravel, type ClubEvent, type Data, type Expense, type Member } from "./types.ts";
 
-export type Line = { member: Member; owed: number; paid: number; net: number };
+/** collected は集金で払った分（プラス）と、預かった分・返金を受けた分（マイナス）の合計 */
+export type Line = { member: Member; owed: number; paid: number; collected: number; net: number };
 export type Transfer = { from: string; to: string; amount: number };
 export type Settlement = {
   total: number;
@@ -52,6 +53,7 @@ export function split(amount: number, members: Member[]): Map<string, number> {
 export function settle(data: Data, eventIds: string[]): Settlement {
   const owed = new Map<string, number>();
   const paid = new Map<string, number>();
+  const collected = new Map<string, number>();
   const add = (map: Map<string, number>, id: string, yen: number) => map.set(id, (map.get(id) ?? 0) + yen);
   let total = 0;
   let excluded = 0;
@@ -80,12 +82,26 @@ export function settle(data: Data, eventIds: string[]): Settlement {
     }
   }
 
+  for (const c of data.collections.filter((c) => eventIds.includes(c.eventId))) {
+    const event = data.events.find((e) => e.id === c.eventId);
+    if (!c.holderId || !data.members.some((m) => m.id === c.holderId)) {
+      warnings.push(`${c.kind}「${c.note || yen(c.perPerson)}」（${event?.name}）：預かる人が選ばれていません。精算に入っていません。`);
+      continue;
+    }
+    const sign = c.kind === "集金" ? 1 : -1;
+    for (const id of c.memberIds) {
+      add(collected, id, sign * c.perPerson);
+      add(collected, c.holderId, -sign * c.perPerson);
+    }
+  }
+
   const lines = data.members
-    .filter((m) => owed.has(m.id) || paid.has(m.id))
+    .filter((m) => owed.has(m.id) || paid.has(m.id) || collected.has(m.id))
     .map((member) => {
       const o = owed.get(member.id) ?? 0;
       const p = paid.get(member.id) ?? 0;
-      return { member, owed: o, paid: p, net: p - o };
+      const c = collected.get(member.id) ?? 0;
+      return { member, owed: o, paid: p, collected: c, net: p - o + c };
     });
   return { total, excluded, lines, transfers: transfersFor(lines.map((l) => ({ id: l.member.id, net: l.net }))), warnings };
 }

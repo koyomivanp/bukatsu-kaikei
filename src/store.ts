@@ -6,7 +6,7 @@ const KEY = "bukatsu-kaikei:v1";
 export type Update = (fn: (data: Data) => Data) => void;
 
 export function emptyData(): Data {
-  return { version: 2, members: [], events: [], expenses: [], settled: {} };
+  return { version: 2, members: [], events: [], expenses: [], receipts: [], collections: [], settled: {} };
 }
 
 type OldEvent = Partial<ClubEvent> & { driverIds?: string[] };
@@ -25,7 +25,8 @@ export function normalize(raw: Partial<Omit<Data, "version">>): Data {
     id: m.id!,
     name: m.name ?? "",
     grade: m.grade ?? 1,
-    gender: m.gender ?? "未設定",
+    // 以前あった「その他」は未設定に戻す
+    gender: m.gender === "男" || m.gender === "女" ? m.gender : "未設定",
     status: m.status ?? (retired ? "OB" : "在籍"),
     ...(m.studentId ? { studentId: m.studentId } : {}),
     ...(m.faculty ? { faculty: m.faculty } : {}),
@@ -50,14 +51,14 @@ export function normalize(raw: Partial<Omit<Data, "version">>): Data {
       amount: x.amount ?? 0,
       driverId: x.driverId !== undefined ? x.driverId : travel && x.payerId && trip?.driverIds.includes(x.payerId) ? x.payerId : null,
       payerId: x.payerId ?? null,
-      burden: x.burden ?? { mode: "all" },
+      burden: x.burden?.mode === "filter" ? { ...x.burden, genders: x.burden.genders.filter((g) => g === "男" || g === "女") } : (x.burden ?? { mode: "all" }),
       note: x.note ?? "",
     };
   });
   if (!events.some((e) => e.id === ANNUAL)) {
     events.unshift({ id: ANNUAL, name: "通年（全期間）", participantIds: [], trips: [] });
   }
-  return { version: 2, members, events, expenses, settled: base.settled };
+  return { version: 2, members, events, expenses, receipts: base.receipts, collections: base.collections, settled: base.settled };
 }
 
 /** その部員が記録に出てくる回数（立て替え・運転・個別指定・対象・乗車） */
@@ -66,7 +67,8 @@ export function usageOf(data: Data, id: string): { paid: number; other: number }
   const drove = data.expenses.filter((x) => x.driverId === id && x.payerId !== id).length;
   const picked = data.expenses.filter((x) => x.burden.mode === "pick" && x.burden.memberIds.includes(id)).length;
   const inEvents = data.events.filter((e) => [...e.participantIds, ...e.trips.flatMap((t) => [...t.riderIds, ...t.driverIds])].includes(id)).length;
-  return { paid, other: drove + picked + inEvents };
+  const collected = data.collections.filter((c) => c.holderId === id || c.memberIds.includes(id)).length;
+  return { paid, other: drove + picked + inEvents + collected };
 }
 
 /** 部員を消し、記録からも外す。その人が立て替えた支出は「立て替えた人：未選択」になる。 */
@@ -86,6 +88,7 @@ export function removeMember(data: Data, id: string): Data {
       payerId: x.payerId === id ? null : x.payerId,
       burden: x.burden.mode === "pick" ? { ...x.burden, memberIds: drop(x.burden.memberIds) } : x.burden,
     })),
+    collections: data.collections.map((c) => ({ ...c, holderId: c.holderId === id ? null : c.holderId, memberIds: drop(c.memberIds) })),
     settled: Object.fromEntries(Object.entries(data.settled).map(([k, v]) => [k, drop(v)])),
   };
 }

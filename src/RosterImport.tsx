@@ -69,7 +69,7 @@ export function RosterImport({ data, update }: { data: Data; update: Update }) {
               <p className="hint">継続届には性別がないので、ここで選んでください。あとから名簿でも変えられます。</p>
               <div className="row">
                 <span className="hint">まとめて：</span>
-                {FILTER_GENDERS.slice(0, 2).map((g) => (
+                {FILTER_GENDERS.map((g) => (
                   <button key={g} type="button" className="small" onClick={() => setGenders(Object.fromEntries(plan.added.map((_, i) => [i, g])))}>
                     全員を{g}にする
                   </button>

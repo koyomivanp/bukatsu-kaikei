@@ -1,25 +1,10 @@
 import { useState } from "react";
 import { burdenOf, participantsOf, split, yen } from "./settle.ts";
+import { MemberOptions } from "./MemberOptions.tsx";
 import { newId } from "./store.ts";
-import { CATEGORIES, FILTER_GENDERS, isActive, isTravel, type Burden, type Category, type ClubEvent, type Data, type Expense, type Gender, type Member } from "./types.ts";
+import { CATEGORIES, FILTER_GENDERS, isActive, isTravel, type Burden, type Category, type ClubEvent, type Data, type Expense, type Gender } from "./types.ts";
 
 const travelInitial = (initial: Expense | null) => initial !== null && isTravel(initial.category);
-
-/** 学年ごとにまとめた部員の選択肢 */
-function MemberOptions({ members }: { members: Member[] }) {
-  const grades = [...new Set(members.map((m) => m.grade))].sort();
-  return grades.map((g) => (
-    <optgroup key={g} label={`${g}年`}>
-      {members
-        .filter((m) => m.grade === g)
-        .map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.name}
-          </option>
-        ))}
-    </optgroup>
-  ));
-}
 
 export function ExpenseForm({
   data,
