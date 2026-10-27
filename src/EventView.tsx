@@ -35,8 +35,22 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
     patchEvent({ trips: event.trips.map((t) => (t.id === tripId ? { ...t, ...patch } : t)) });
 
   const saveExpense = (expense: Expense) => {
+    const driver = expense.driverId;
     update((d) => ({
       ...d,
+      // 運転した人は、その移動の乗車・運転手にも入れる
+      events: d.events.map((e) =>
+        e.id !== event.id || !driver
+          ? e
+          : {
+              ...e,
+              trips: e.trips.map((t) =>
+                t.id !== expense.tripId || t.driverIds.includes(driver)
+                  ? t
+                  : { ...t, riderIds: t.riderIds.includes(driver) ? t.riderIds : [...t.riderIds, driver], driverIds: [...t.driverIds, driver] },
+              ),
+            },
+      ),
       expenses: d.expenses.some((x) => x.id === expense.id)
         ? d.expenses.map((x) => (x.id === expense.id ? expense : x))
         : [...d.expenses, expense],
@@ -270,7 +284,10 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
                   {x.note && <div className="hint">{x.note}</div>}
                 </td>
                 <td className="num">{yen(x.amount)}</td>
-                <td>{nameOf(x.payerId)}</td>
+                <td>
+                  {nameOf(x.payerId)}
+                  {x.driverId && x.driverId !== x.payerId && <div className="hint">運転：{nameOf(x.driverId)}</div>}
+                </td>
                 <td>{burdenLabel(x, event)}</td>
                 <td className="num">{burdenOf(data, event, x).length}人</td>
                 <td className="no-print actions">

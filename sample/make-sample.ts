@@ -21,7 +21,7 @@ const active = members.filter(isActive).map((m) => m.id);
 
 let n = 0;
 const ex = (eventId: string, category: Expense["category"], tripId: string | null, date: string, title: string, amount: number, payer: string | null, burden: Expense["burden"] = { mode: "all" }, note = ""): Expense => ({
-  id: `x${++n}`, eventId, category, tripId, date, title, amount, payerId: payer ? id(payer) : null, burden, note,
+  id: `x${++n}`, eventId, category, tripId, date, title, amount, driverId: category !== "雑費" && payer ? id(payer) : null, payerId: payer ? id(payer) : null, burden, note,
 });
 const all = { mode: "all" } as const;
 

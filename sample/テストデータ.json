@@ -188,6 +188,7 @@
       "date": "2026-04-10",
       "title": "男子ユニフォーム",
       "amount": 15000,
+      "driverId": null,
       "payerId": null,
       "burden": {
         "mode": "filter",
@@ -206,6 +207,7 @@
       "date": "2026-04-20",
       "title": "ボール・備品",
       "amount": 8000,
+      "driverId": null,
       "payerId": "m2",
       "burden": {
         "mode": "all"
@@ -220,6 +222,7 @@
       "date": "2026-08-01",
       "title": "佐藤車",
       "amount": 4200,
+      "driverId": "m1",
       "payerId": "m1",
       "burden": {
         "mode": "all"
@@ -234,6 +237,7 @@
       "date": "2026-08-01",
       "title": "高橋車",
       "amount": 3800,
+      "driverId": "m3",
       "payerId": "m3",
       "burden": {
         "mode": "all"
@@ -248,6 +252,7 @@
       "date": "2026-08-01",
       "title": "",
       "amount": 5600,
+      "driverId": "m1",
       "payerId": "m1",
       "burden": {
         "mode": "all"
@@ -262,6 +267,7 @@
       "date": "2026-08-02",
       "title": "差し入れ",
       "amount": 12345,
+      "driverId": null,
       "payerId": "m4",
       "burden": {
         "mode": "all"
@@ -276,6 +282,7 @@
       "date": "2026-08-02",
       "title": "1年の宿泊差額",
       "amount": 3000,
+      "driverId": null,
       "payerId": null,
       "burden": {
         "mode": "filter",
@@ -294,6 +301,7 @@
       "date": "2026-08-03",
       "title": "女子部屋の追加布団",
       "amount": 2400,
+      "driverId": null,
       "payerId": "m6",
       "burden": {
         "mode": "filter",
@@ -312,6 +320,7 @@
       "date": "2026-08-20",
       "title": "",
       "amount": 3980,
+      "driverId": "m2",
       "payerId": "m2",
       "burden": {
         "mode": "all"
@@ -326,6 +335,7 @@
       "date": "2026-08-20",
       "title": "",
       "amount": 2710,
+      "driverId": "m2",
       "payerId": "m2",
       "burden": {
         "mode": "all"
@@ -340,6 +350,7 @@
       "date": "2026-10-12",
       "title": "",
       "amount": 3000,
+      "driverId": "m4",
       "payerId": "m4",
       "burden": {
         "mode": "all"
@@ -354,6 +365,7 @@
       "date": "2026-10-12",
       "title": "",
       "amount": 2400,
+      "driverId": "m5",
       "payerId": "m5",
       "burden": {
         "mode": "all"
@@ -368,6 +380,7 @@
       "date": "2026-10-12",
       "title": "大会参加費（3年のみ）",
       "amount": 6000,
+      "driverId": null,
       "payerId": null,
       "burden": {
         "mode": "filter",
@@ -386,6 +399,7 @@
       "date": "2026-10-12",
       "title": "先輩への差し入れ",
       "amount": 2000,
+      "driverId": null,
       "payerId": "m5",
       "burden": {
         "mode": "pick",

@@ -67,6 +67,8 @@ export type Expense = {
   date: string;
   title: string;
   amount: number;
+  /** 高速・ガソリンのときの運転した人。その移動の高速・ガソリンの割り勘から外れる */
+  driverId: string | null;
   /** null は部費（会計）から支払い */
   payerId: string | null;
   /** 雑費のときだけ使う */

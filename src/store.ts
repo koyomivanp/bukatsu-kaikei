@@ -32,14 +32,17 @@ export function normalize(raw: Partial<Omit<Data, "version">>): Data {
   const expenses: Expense[] = (base.expenses as OldExpense[]).map((x) => {
     const event = events.find((e) => e.id === x.eventId);
     const travel = x.category ? x.category !== "雑費" : x.driverExempt === true;
+    const tripId = x.tripId !== undefined ? x.tripId : travel ? (event?.trips[0]?.id ?? null) : null;
+    const trip = event?.trips.find((t) => t.id === tripId);
     return {
       id: x.id!,
       eventId: x.eventId!,
       category: x.category ?? (travel ? "ガソリン" : "雑費"),
-      tripId: x.tripId !== undefined ? x.tripId : travel ? (event?.trips[0]?.id ?? null) : null,
+      tripId,
       date: x.date ?? "",
       title: x.title ?? "",
       amount: x.amount ?? 0,
+      driverId: x.driverId !== undefined ? x.driverId : travel && x.payerId && trip?.driverIds.includes(x.payerId) ? x.payerId : null,
       payerId: x.payerId ?? null,
       burden: x.burden ?? { mode: "all" },
       note: x.note ?? "",
@@ -51,12 +54,13 @@ export function normalize(raw: Partial<Omit<Data, "version">>): Data {
   return { version: 2, members, events, expenses, settled: base.settled };
 }
 
-/** その部員が記録に出てくる回数（立て替え・個別指定・対象・乗車・運転） */
+/** その部員が記録に出てくる回数（立て替え・運転・個別指定・対象・乗車） */
 export function usageOf(data: Data, id: string): { paid: number; other: number } {
   const paid = data.expenses.filter((x) => x.payerId === id).length;
+  const drove = data.expenses.filter((x) => x.driverId === id && x.payerId !== id).length;
   const picked = data.expenses.filter((x) => x.burden.mode === "pick" && x.burden.memberIds.includes(id)).length;
   const inEvents = data.events.filter((e) => [...e.participantIds, ...e.trips.flatMap((t) => [...t.riderIds, ...t.driverIds])].includes(id)).length;
-  return { paid, other: picked + inEvents };
+  return { paid, other: drove + picked + inEvents };
 }
 
 /** 部員を消し、記録からも外す。その人が立て替えた支出は「部費から支払い」になる。 */
@@ -72,6 +76,7 @@ export function removeMember(data: Data, id: string): Data {
     })),
     expenses: data.expenses.map((x) => ({
       ...x,
+      driverId: x.driverId === id ? null : x.driverId,
       payerId: x.payerId === id ? null : x.payerId,
       burden: x.burden.mode === "pick" ? { ...x.burden, memberIds: drop(x.burden.memberIds) } : x.burden,
     })),

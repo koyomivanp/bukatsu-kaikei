@@ -25,7 +25,7 @@ export function burdenOf(data: Data, event: ClubEvent, expense: Expense): Member
   if (isTravel(expense.category)) {
     const trip = event.trips.find((t) => t.id === expense.tripId);
     if (!trip) return [];
-    return data.members.filter((m) => trip.riderIds.includes(m.id) && !trip.driverIds.includes(m.id));
+    return data.members.filter((m) => trip.riderIds.includes(m.id) && !trip.driverIds.includes(m.id) && m.id !== expense.driverId);
   }
   const pool = participantsOf(data, event);
   const burden = expense.burden;

@@ -4,7 +4,7 @@ import { ANNUAL, type Data, type Expense, type Member } from "./types.ts";
 
 const m = (id: string, grade: number, gender: Member["gender"]): Member => ({ id, name: id, grade, gender, status: "在籍" });
 const x = (id: string, eventId: string, category: Expense["category"], tripId: string | null, amount: number, payerId: string | null, burden: Expense["burden"] = { mode: "all" }): Expense => ({
-  id, eventId, category, tripId, date: "", title: "", amount, payerId, burden, note: "",
+  id, eventId, category, tripId, date: "", title: "", amount, driverId: category === "雑費" ? null : payerId, payerId, burden, note: "",
 });
 const data: Data = {
   version: 2,
@@ -68,6 +68,14 @@ const old = normalize({
 check("旧データ：運転手つきの会計は移動1つに変換", old.events[1].trips.length === 1 && old.events[1].trips[0].driverIds[0] === "A");
 check("旧データ：運転手免除の支出はガソリン＋その移動に変換", old.expenses[0].category === "ガソリン" && old.expenses[0].tripId === old.events[1].trips[0].id);
 check("旧データ：通年が先頭に追加される", old.events[0].id === ANNUAL);
+check("旧データ：運転手が立て替えた交通費は、その人が運転者になる", old.expenses[0].driverId === "A");
+// t1 の運転手は C だけ。支出で運転者に B を選ぶと、その支出は B も外して割る
+const byB = { ...x("7", "camp", "高速", "t1", 1000, "B"), driverId: "B" };
+check("運転者に選んだ人はその支出の割り勘から外れる", burdenOf(data, data.events[1], byB).map((p) => p.id).join() === "A,D");
+check("運転者と立て替えた人が別でも、立て替えた人に返る", (() => {
+  const r = settle({ ...data, expenses: [{ ...byB, payerId: "E" }] }, ["camp"]);
+  return r.lines.find((l) => l.member.id === "E")!.paid === 1000 && (r.lines.find((l) => l.member.id === "B")?.owed ?? 0) === 0;
+})());
 const oldMembers = normalize({ members: [{ id: "P", name: "P", grade: 4, gender: "男", retired: true }, { id: "Q", name: "Q", grade: 1, gender: "女", retired: false }] as never });
 check("旧データ：引退チェックは OB、それ以外は在籍", oldMembers.members[0].status === "OB" && oldMembers.members[1].status === "在籍");
 
