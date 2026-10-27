@@ -1,0 +1,403 @@
+{
+  "version": 2,
+  "members": [
+    {
+      "id": "m1",
+      "name": "佐藤 健太",
+      "grade": 3,
+      "gender": "男",
+      "status": "在籍"
+    },
+    {
+      "id": "m2",
+      "name": "鈴木 美咲",
+      "grade": 3,
+      "gender": "女",
+      "status": "在籍"
+    },
+    {
+      "id": "m3",
+      "name": "高橋 翔",
+      "grade": 3,
+      "gender": "男",
+      "status": "在籍"
+    },
+    {
+      "id": "m4",
+      "name": "田中 葵",
+      "grade": 2,
+      "gender": "女",
+      "status": "在籍"
+    },
+    {
+      "id": "m5",
+      "name": "伊藤 大輝",
+      "grade": 2,
+      "gender": "男",
+      "status": "在籍"
+    },
+    {
+      "id": "m6",
+      "name": "渡辺 さくら",
+      "grade": 2,
+      "gender": "女",
+      "status": "在籍"
+    },
+    {
+      "id": "m7",
+      "name": "山本 湊",
+      "grade": 1,
+      "gender": "男",
+      "status": "在籍"
+    },
+    {
+      "id": "m8",
+      "name": "中村 ひなた",
+      "grade": 1,
+      "gender": "女",
+      "status": "在籍"
+    },
+    {
+      "id": "m9",
+      "name": "小林 蒼",
+      "grade": 1,
+      "gender": "その他",
+      "status": "在籍"
+    },
+    {
+      "id": "m10",
+      "name": "加藤 陽菜",
+      "grade": 1,
+      "gender": "女",
+      "status": "在籍"
+    },
+    {
+      "id": "m11",
+      "name": "吉田 拓海",
+      "grade": 3,
+      "gender": "男",
+      "status": "退部"
+    }
+  ],
+  "events": [
+    {
+      "id": "annual",
+      "name": "通年（全期間）",
+      "participantIds": [],
+      "trips": []
+    },
+    {
+      "id": "summer",
+      "name": "夏合宿まで",
+      "participantIds": [
+        "m1",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "m6",
+        "m7",
+        "m8",
+        "m9",
+        "m10"
+      ],
+      "trips": [
+        {
+          "id": "s1",
+          "name": "①合宿",
+          "riderIds": [
+            "m1",
+            "m2",
+            "m3",
+            "m4",
+            "m5",
+            "m6",
+            "m7",
+            "m8",
+            "m9"
+          ],
+          "driverIds": [
+            "m1",
+            "m3"
+          ]
+        },
+        {
+          "id": "s2",
+          "name": "②遠征",
+          "riderIds": [
+            "m1",
+            "m2",
+            "m3",
+            "m4",
+            "m5",
+            "m6",
+            "m7",
+            "m10"
+          ],
+          "driverIds": [
+            "m2"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "autumn",
+      "name": "秋の大会まで",
+      "participantIds": [
+        "m1",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "m6",
+        "m7",
+        "m8",
+        "m9",
+        "m10"
+      ],
+      "trips": [
+        {
+          "id": "a1",
+          "name": "①大会",
+          "riderIds": [
+            "m1",
+            "m2",
+            "m3",
+            "m4",
+            "m5",
+            "m6",
+            "m7",
+            "m8",
+            "m9",
+            "m10"
+          ],
+          "driverIds": [
+            "m4",
+            "m5"
+          ]
+        }
+      ]
+    }
+  ],
+  "expenses": [
+    {
+      "id": "x1",
+      "eventId": "annual",
+      "category": "雑費",
+      "tripId": null,
+      "date": "2026-04-10",
+      "title": "男子ユニフォーム",
+      "amount": 15000,
+      "payerId": null,
+      "burden": {
+        "mode": "filter",
+        "grades": [],
+        "genders": [
+          "男"
+        ]
+      },
+      "note": ""
+    },
+    {
+      "id": "x2",
+      "eventId": "annual",
+      "category": "雑費",
+      "tripId": null,
+      "date": "2026-04-20",
+      "title": "ボール・備品",
+      "amount": 8000,
+      "payerId": "m2",
+      "burden": {
+        "mode": "all"
+      },
+      "note": "スポーツデポ"
+    },
+    {
+      "id": "x3",
+      "eventId": "summer",
+      "category": "ガソリン",
+      "tripId": "s1",
+      "date": "2026-08-01",
+      "title": "佐藤車",
+      "amount": 4200,
+      "payerId": "m1",
+      "burden": {
+        "mode": "all"
+      },
+      "note": ""
+    },
+    {
+      "id": "x4",
+      "eventId": "summer",
+      "category": "ガソリン",
+      "tripId": "s1",
+      "date": "2026-08-01",
+      "title": "高橋車",
+      "amount": 3800,
+      "payerId": "m3",
+      "burden": {
+        "mode": "all"
+      },
+      "note": ""
+    },
+    {
+      "id": "x5",
+      "eventId": "summer",
+      "category": "高速",
+      "tripId": "s1",
+      "date": "2026-08-01",
+      "title": "",
+      "amount": 5600,
+      "payerId": "m1",
+      "burden": {
+        "mode": "all"
+      },
+      "note": ""
+    },
+    {
+      "id": "x6",
+      "eventId": "summer",
+      "category": "雑費",
+      "tripId": null,
+      "date": "2026-08-02",
+      "title": "差し入れ",
+      "amount": 12345,
+      "payerId": "m4",
+      "burden": {
+        "mode": "all"
+      },
+      "note": "イオン"
+    },
+    {
+      "id": "x7",
+      "eventId": "summer",
+      "category": "雑費",
+      "tripId": null,
+      "date": "2026-08-02",
+      "title": "1年の宿泊差額",
+      "amount": 3000,
+      "payerId": null,
+      "burden": {
+        "mode": "filter",
+        "grades": [
+          1
+        ],
+        "genders": []
+      },
+      "note": ""
+    },
+    {
+      "id": "x8",
+      "eventId": "summer",
+      "category": "雑費",
+      "tripId": null,
+      "date": "2026-08-03",
+      "title": "女子部屋の追加布団",
+      "amount": 2400,
+      "payerId": "m6",
+      "burden": {
+        "mode": "filter",
+        "grades": [],
+        "genders": [
+          "女"
+        ]
+      },
+      "note": ""
+    },
+    {
+      "id": "x9",
+      "eventId": "summer",
+      "category": "高速",
+      "tripId": "s2",
+      "date": "2026-08-20",
+      "title": "",
+      "amount": 3980,
+      "payerId": "m2",
+      "burden": {
+        "mode": "all"
+      },
+      "note": ""
+    },
+    {
+      "id": "x10",
+      "eventId": "summer",
+      "category": "ガソリン",
+      "tripId": "s2",
+      "date": "2026-08-20",
+      "title": "",
+      "amount": 2710,
+      "payerId": "m2",
+      "burden": {
+        "mode": "all"
+      },
+      "note": ""
+    },
+    {
+      "id": "x11",
+      "eventId": "autumn",
+      "category": "ガソリン",
+      "tripId": "a1",
+      "date": "2026-10-12",
+      "title": "",
+      "amount": 3000,
+      "payerId": "m4",
+      "burden": {
+        "mode": "all"
+      },
+      "note": ""
+    },
+    {
+      "id": "x12",
+      "eventId": "autumn",
+      "category": "高速",
+      "tripId": "a1",
+      "date": "2026-10-12",
+      "title": "",
+      "amount": 2400,
+      "payerId": "m5",
+      "burden": {
+        "mode": "all"
+      },
+      "note": ""
+    },
+    {
+      "id": "x13",
+      "eventId": "autumn",
+      "category": "雑費",
+      "tripId": null,
+      "date": "2026-10-12",
+      "title": "大会参加費（3年のみ）",
+      "amount": 6000,
+      "payerId": null,
+      "burden": {
+        "mode": "filter",
+        "grades": [
+          3
+        ],
+        "genders": []
+      },
+      "note": ""
+    },
+    {
+      "id": "x14",
+      "eventId": "autumn",
+      "category": "雑費",
+      "tripId": null,
+      "date": "2026-10-12",
+      "title": "先輩への差し入れ",
+      "amount": 2000,
+      "payerId": "m5",
+      "burden": {
+        "mode": "pick",
+        "memberIds": [
+          "m7",
+          "m8",
+          "m9",
+          "m10"
+        ]
+      },
+      "note": ""
+    }
+  ],
+  "settled": {}
+}
