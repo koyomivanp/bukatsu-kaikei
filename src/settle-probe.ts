@@ -1,6 +1,8 @@
 import { burdenOf, participantsOf, settle, settlementText, yen } from "./settle.ts";
 import { normalize, removeMember, usageOf } from "./store.ts";
-import { autoMatch, cleanName, createFromReceipt, findPayer } from "./receipts.ts";
+import { expenseFromRow, missingOf, rowsFromMessages, type MessageItem } from "./messages.ts";
+import { cleanName, findMember } from "./names.ts";
+import { autoMatch } from "./receipts.ts";
 import { ANNUAL, isDefaultParticipant, type Data, type Expense, type Member, type Receipt } from "./types.ts";
 
 const m = (id: string, grade: number, gender: Member["gender"]): Member => ({ id, name: id, grade, gender, status: "在籍" });
@@ -99,7 +101,7 @@ check("削除後も精算の合計は合う", (() => {
 check("記録の数を数える", usageOf(data, "C").paid === 1 && usageOf(data, "C").other === 1 && usageOf(data, "B").paid === 0);
 
 // レシートの照合：金額が同じで、まだレシートのない支出に1対1で決まるものだけ結びつける
-const r = (id: string, amount: number | null, eventId = "camp"): Receipt => ({ id, eventId, fileName: `${id}.jpg`, fileSize: 1, store: "", date: "", amount, summary: "", category: "雑費", payerNote: "", expenseId: null });
+const r = (id: string, amount: number | null, eventId = "camp"): Receipt => ({ id, eventId, fileName: `${id}.jpg`, fileSize: 1, store: "", date: "", amount, summary: "", expenseId: null });
 const matched = autoMatch({ ...data, receipts: [r("r1", 3000), r("r2", 3001), r("r3", 3001), r("r4", 5000, ANNUAL), r("r5", null), r("r6", 9999)] }, "camp");
 const linkOf = (id: string) => matched.receipts.find((x) => x.id === id)!.expenseId;
 check("レシート：金額が1つだけ一致すれば結びつく", linkOf("r1") === "1");
@@ -130,34 +132,36 @@ check("集金：預かる人のない集金は警告して入れない", col.war
 check("集金：ほかの会計の精算には入らない", settle(withCollect, [ANNUAL]).lines.every((l) => l.collected === 0));
 check("削除：集金の預かる人を消すと未選択になる", removeMember(withCollect, "A").collections[0].holderId === null);
 
-// レシートの書き込み「〇〇先払い」から支出を作る
+// LINE のメッセージから支出を作る（AIの読み取り結果 → 名簿・車との照合）
 const named: Data = {
   ...data,
-  expenses: [],
   members: data.members.map((mm, i) => ({ ...mm, name: ["田中 太郎", "田中 花子", "佐藤 健", "鈴木 美咲", "高橋 翔"][i] })),
 };
 const campEvent = named.events[1];
-const rr = (id: string, amount: number | null, category: Receipt["category"], payerNote: string, eventId = "camp"): Receipt => ({ ...r(id, amount, eventId), category, payerNote });
-check("書き込み：名前以外を落とす", cleanName("田中先輩 先払い") === "田中" && cleanName("佐藤立替") === "佐藤" && cleanName(" 鈴木さん ") === "鈴木");
-check("書き込み：名字・名前・フルネームで部員が決まる", findPayer(named, campEvent, "佐藤")?.id === "C" && findPayer(named, campEvent, "花子")?.id === "B" && findPayer(named, campEvent, "田中　花子")?.id === "B");
-check("書き込み：同じ名字が2人いれば決めない", findPayer(named, campEvent, "田中") === null && findPayer(named, campEvent, "") === null);
-const made = (receipt: Receipt) => {
-  const next = createFromReceipt({ ...named, receipts: [receipt] }, receipt.id);
-  return { next, expense: next.expenses[0], linked: next.receipts[0].expenseId };
-};
-const gas = made(rr("g1", 4000, "ガソリン", "佐藤"));
-check("書き込み：ガソリンは書いた人が運転・立て替え、運転した車で割る", gas.expense?.amount === 4000 && gas.expense.payerId === "C" && gas.expense.driverId === "C" && gas.expense.tripId === "t1" && gas.linked === gas.expense.id);
-const misc = made(rr("g2", 1234, "雑費", "鈴木先払い"));
-check("書き込み：雑費は参加者で割る支出になる", misc.expense?.category === "雑費" && misc.expense.payerId === "D" && misc.expense.burden.mode === "all" && misc.expense.driverId === null);
-const highway = made(rr("g3", 800, "高速", "高橋"));
-check("書き込み：運転手として載っている車を選ぶ", highway.expense?.tripId === "t2" && highway.expense.driverId === "E");
-const rider = made(rr("g4", 900, "ガソリン", "花子"));
-check("書き込み：どの車を運転したか決まらなければ作らない", rider.next.expenses.length === 0 && rider.linked === null);
-check("書き込み：名前が決まらない・金額が読めない・書き込みなしは作らない", [rr("g5", 900, "雑費", "田中"), rr("g6", null, "雑費", "佐藤"), rr("g7", 900, "雑費", "")].every((x) => made(x).next.expenses.length === 0));
-check("書き込み：結びつき済みのレシートからは作らない", createFromReceipt({ ...named, receipts: [{ ...rr("g8", 900, "雑費", "佐藤"), expenseId: "1" }] }, "g8").expenses.length === 0);
-const annualGas = made(rr("g9", 3000, "ガソリン", "佐藤", ANNUAL));
-check("書き込み：車のない通年では雑費にする", annualGas.expense?.category === "雑費" && annualGas.expense.eventId === ANNUAL);
-const newDriver = createFromReceipt({ ...named, events: named.events.map((e) => (e.id === "camp" ? { ...e, trips: [e.trips[0]] } : e)), receipts: [rr("g10", 700, "高速", "鈴木")] }, "g10");
-check("書き込み：車が1つなら、書いた人をその車の運転手に入れる", newDriver.expenses[0]?.tripId === "t1" && newDriver.events[1].trips[0].driverIds.includes("D"));
+check("名前：書き方の余計な部分を落とす", cleanName("田中先輩が立て替え") === "田中" && cleanName("佐藤車") === "佐藤" && cleanName(" 鈴木さん ") === "鈴木");
+check("名前：名字・名前・フルネームで部員が決まる", findMember(named, campEvent, "佐藤")?.id === "C" && findMember(named, campEvent, "花子")?.id === "B" && findMember(named, campEvent, "田中　花子")?.id === "B");
+check("名前：同じ名字が2人いれば決めない", findMember(named, campEvent, "田中") === null && findMember(named, campEvent, "") === null);
+const item = (p: Partial<MessageItem>): MessageItem => ({ sender: "", category: "雑費", driver: "", payer: "", amount: 1000, title: "", quote: "q", ...p });
+const [hw, misc, paidBy, rider, unknown, dup, noAmount] = rowsFromMessages(named, campEvent, [
+  item({ sender: "高橋 翔", category: "高速", driver: "高橋", amount: 2000 }),
+  item({ sender: "鈴木", amount: 3280, title: "花火" }),
+  item({ sender: "佐藤", category: "ガソリン", payer: "鈴木", amount: 4500 }),
+  item({ sender: "花子", category: "ガソリン", amount: 900 }),
+  item({ sender: "たくみ", amount: 500 }),
+  item({ sender: "佐藤", category: "ガソリン", driver: "佐藤", amount: 3000 }),
+  item({ sender: "佐藤", amount: null }),
+]);
+check("メッセージ：「高橋車 高速」は高橋が運転・立て替え、運転した車で割る", hw.driverId === "E" && hw.payerId === "E" && hw.tripId === "t2" && hw.include);
+check("メッセージ：雑費は送った人が立て替え", misc.payerId === "D" && misc.driverId === null && misc.tripId === null && misc.title === "花火" && misc.include);
+check("メッセージ：「鈴木払い」なら鈴木が立て替え・運転", paidBy.payerId === "D" && paidBy.driverId === "D" && paidBy.tripId === "t2");
+check("メッセージ：どの車か決まらなければ選んでもらう", rider.driverId === "B" && rider.tripId === null && !rider.include && missingOf(rider).join() === "運転した人");
+check("メッセージ：名簿にない名前は立て替えた人を選んでもらう", unknown.payerId === null && !unknown.include && missingOf(unknown).join() === "立て替えた人");
+check("メッセージ：同じ費目・金額・立て替えた人の支出がすでにあれば外しておく", dup.duplicate && !dup.include);
+check("メッセージ：金額がなければ選んでもらう", missingOf(noAmount).join() === "金額" && !noAmount.include);
+check("メッセージ：同じ内容が2回あれば2回目を外す", rowsFromMessages(named, campEvent, [item({ sender: "鈴木", amount: 777 }), item({ sender: "鈴木", amount: 777 })]).map((r) => r.include).join() === "true,false");
+check("メッセージ：車のない通年では雑費にする", rowsFromMessages(named, named.events[0], [item({ sender: "佐藤", category: "ガソリン", amount: 100 })])[0].category === "雑費");
+const fromRow = expenseFromRow(campEvent, hw);
+check("メッセージ：支出にすると参加者割り・元のメッセージがメモに残る", fromRow.category === "高速" && fromRow.amount === 2000 && fromRow.burden.mode === "all" && fromRow.note === "q" && fromRow.eventId === "camp");
+check("旧データ：レシートの書き込み欄は落とす", !("payerNote" in normalize({ receipts: [{ ...r("z", 1), payerNote: "田中", category: "雑費" } as never] }).receipts[0]));
 
 if (failed > 0) throw new Error(`${failed}件の確認に失敗`);

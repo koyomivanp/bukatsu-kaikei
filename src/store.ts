@@ -74,7 +74,8 @@ export function normalize(raw: Partial<Omit<Data, "version">>): Data {
   if (!events.some((e) => e.id === ANNUAL)) {
     events.unshift({ id: ANNUAL, name: "通年（全期間）", participantIds: [], trips: [] });
   }
-  const receipts: Receipt[] = base.receipts.map((r) => ({ ...r, category: r.category ?? "雑費", payerNote: r.payerNote ?? "" }));
+  // 一時期あった、レシートの費目と「〇〇先払い」の書き込みは使わないので落とす
+  const receipts: Receipt[] = (base.receipts as (Receipt & { category?: unknown; payerNote?: unknown })[]).map(({ category, payerNote, ...r }) => r);
   return { version: 2, members, events, expenses, receipts, collections: base.collections, settled: base.settled };
 }
 

@@ -2,7 +2,9 @@ import { useState } from "react";
 import { Collections } from "./Collections.tsx";
 import { ExpenseForm } from "./ExpenseForm.tsx";
 import { PeoplePanel } from "./PeoplePanel.tsx";
-import { autoMatch, draftFromReceipt, receiptLabel, receiptsOf } from "./receipts.ts";
+import { loadApiKey } from "./claude.ts";
+import { MessageImport } from "./MessageImport.tsx";
+import { autoMatch, receiptLabel, receiptsOf } from "./receipts.ts";
 import { Receipts } from "./Receipts.tsx";
 import { SettlementView } from "./SettlementView.tsx";
 import { burdenOf, settle, yen } from "./settle.ts";
@@ -35,9 +37,9 @@ function ReceiptNote({ receipts, amount }: { receipts: Receipt[]; amount: number
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 
 export function EventView({ data, update, event, onBack }: { data: Data; update: Update; event: ClubEvent; onBack: () => void }) {
-  // 「新規」「既存の支出の編集」「レシートから作る」のどれか
-  const [editing, setEditing] = useState<Expense | "new" | { draft: Expense; receiptId: string } | null>(null);
-  const fromReceipt = editing !== null && editing !== "new" && "draft" in editing ? editing : null;
+  const [editing, setEditing] = useState<Expense | "new" | null>(null);
+  const [pasting, setPasting] = useState(false);
+  const [apiKey, setApiKey] = useState(loadApiKey);
   const annual = event.id === ANNUAL;
   const expenses = data.expenses.filter((x) => x.eventId === event.id);
   const result = settle(data, [event.id]);
@@ -46,20 +48,18 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
   const patchEvent = (patch: Partial<ClubEvent>) =>
     update((d) => ({ ...d, events: d.events.map((e) => (e.id === event.id ? { ...e, ...patch } : e)) }));
 
-  /** 保存して、レシートから作った支出ならそのレシートに結びつける */
-  const saveExpense = (expense: Expense, receiptId: string | null) => {
+  /** 運転した人を車に入れて保存し、同じ金額のレシートがあれば結びつける */
+  const saveExpenses = (list: Expense[]) => {
     update((d) =>
       autoMatch(
         {
           ...d,
-          events: d.events.map((e) => withDriver(e, expense)),
-          expenses: d.expenses.some((x) => x.id === expense.id) ? d.expenses.map((x) => (x.id === expense.id ? expense : x)) : [...d.expenses, expense],
-          receipts: d.receipts.map((r) => (r.id === receiptId ? { ...r, expenseId: expense.id } : r)),
+          events: d.events.map((e) => list.reduce(withDriver, e)),
+          expenses: [...d.expenses.map((x) => list.find((y) => y.id === x.id) ?? x), ...list.filter((y) => !d.expenses.some((x) => x.id === y.id))],
         },
         event.id,
       ),
     );
-    setEditing(null);
   };
 
   return (
@@ -110,18 +110,38 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
       <div className="card">
         <div className="row spread">
           <h3>支出</h3>
-          <button type="button" className="primary no-print" onClick={() => setEditing("new")}>
-            ＋ 支出を追加
-          </button>
+          <div className="row no-print">
+            <button type="button" onClick={() => setPasting(true)}>
+              メッセージから追加
+            </button>
+            <button type="button" className="primary" onClick={() => setEditing("new")}>
+              ＋ 支出を追加
+            </button>
+          </div>
         </div>
-        {editing && (
-          <ExpenseForm
-            key={editing === "new" ? "new" : fromReceipt ? fromReceipt.draft.id : (editing as Expense).id}
+        {pasting && (
+          <MessageImport
             data={data}
             event={event}
-            initial={editing === "new" || fromReceipt ? null : (editing as Expense)}
-            prefill={fromReceipt?.draft ?? null}
-            onSave={(expense) => saveExpense(expense, fromReceipt?.receiptId ?? null)}
+            apiKey={apiKey}
+            setApiKey={setApiKey}
+            onAdd={(list) => {
+              saveExpenses(list);
+              setPasting(false);
+            }}
+            onClose={() => setPasting(false)}
+          />
+        )}
+        {editing && (
+          <ExpenseForm
+            key={editing === "new" ? "new" : editing.id}
+            data={data}
+            event={event}
+            initial={editing === "new" ? null : editing}
+            onSave={(expense) => {
+              saveExpenses([expense]);
+              setEditing(null);
+            }}
             onCancel={() => setEditing(null)}
           />
         )}
@@ -194,7 +214,8 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
         data={data}
         update={update}
         event={event}
-        onCreateExpense={(receipt) => setEditing({ draft: draftFromReceipt(data, event, receipt), receiptId: receipt.id })}
+        apiKey={apiKey}
+        setApiKey={setApiKey}
       />
 
       <SettlementView

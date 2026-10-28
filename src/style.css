@@ -302,6 +302,44 @@ button.event {
   gap: 10px;
 }
 
+.message-import {
+  background: var(--accent-soft);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.message-import h4 {
+  margin: 0 0 4px;
+}
+
+.message-import details.api-key {
+  margin-bottom: 8px;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  margin-bottom: 8px;
+}
+
+.message-rows {
+  background: var(--card);
+}
+
+.message-rows td.quote {
+  min-width: 180px;
+  max-width: 280px;
+}
+
+.message-rows .tag {
+  margin-left: 6px;
+}
+
+.message-rows input:not([type="checkbox"]) {
+  width: 100%;
+  min-width: 80px;
+}
+
 .expense-form .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));

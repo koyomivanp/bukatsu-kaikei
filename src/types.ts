@@ -92,10 +92,6 @@ export type Receipt = {
   /** 合計金額。読めなければ null */
   amount: number | null;
   summary: string;
-  /** AIが見分けた費目（高速道路・ガソリンスタンド・それ以外） */
-  category: Category;
-  /** レシートに手書きなどで書かれた、立て替えた人の名前（「田中先払い」なら「田中」）。なければ空 */
-  payerNote: string;
   /** 結びついた支出。1つの支出に複数のレシートがつくこともある */
   expenseId: string | null;
 };

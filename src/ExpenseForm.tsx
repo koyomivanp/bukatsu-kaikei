@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { burdenOf, participantsOf, split, yen } from "./settle.ts";
-import { MemberOptions } from "./MemberOptions.tsx";
+import { DriverOptions, MemberOptions } from "./MemberOptions.tsx";
 import { newId } from "./store.ts";
 import { ANNUAL, CATEGORIES, FILTER_GENDERS, isActive, isTravel, type Burden, type Category, type ClubEvent, type Data, type Expense, type Gender } from "./types.ts";
 
@@ -10,54 +10,41 @@ export function ExpenseForm({
   data,
   event,
   initial,
-  prefill = null,
   onSave,
   onCancel,
 }: {
   data: Data;
   event: ClubEvent;
   initial: Expense | null;
-  /** 新しい支出の入力欄に最初から入れておく内容（レシートから作るとき） */
-  prefill?: Expense | null;
   onSave: (expense: Expense) => void;
   onCancel: () => void;
 }) {
   const people = participantsOf(data, event);
-  const base = initial ?? prefill;
-  const [category, setCategory] = useState<Category>(base?.category ?? "雑費");
+  const [category, setCategory] = useState<Category>(initial?.category ?? "雑費");
   // 運転した人を選ぶと移動も決まる。最初は運転手のいる最初の移動の、最初の運転手
   const firstTrip = event.trips.find((t) => t.driverIds.length > 0) ?? event.trips[0];
-  const [tripId, setTripId] = useState(base?.tripId ?? firstTrip?.id ?? "");
-  // レシートから作るときに運転した人が分からなければ、勝手に選ばず空にしておく
-  const [driverId, setDriverId] = useState<string>(base ? (base.driverId ?? "") : (firstTrip?.driverIds[0] ?? ""));
-  const [otherPayer, setOtherPayer] = useState(travelInitial(base) && base!.payerId !== base!.driverId);
-  const [title, setTitle] = useState(base?.title ?? "");
-  const [amount, setAmount] = useState(base && base.amount > 0 ? String(base.amount) : "");
-  const [payerId, setPayerId] = useState<string>(base?.payerId ?? "");
-  const [mode, setMode] = useState<Burden["mode"]>(base?.burden.mode ?? "all");
-  const [grades, setGrades] = useState<number[]>(base?.burden.mode === "filter" ? base.burden.grades : []);
-  const [genders, setGenders] = useState<Gender[]>(base?.burden.mode === "filter" ? base.burden.genders : []);
-  const [picked, setPicked] = useState<string[]>(base?.burden.mode === "pick" ? base.burden.memberIds : []);
-  const [note, setNote] = useState(base?.note ?? "");
+  const [tripId, setTripId] = useState(initial?.tripId ?? firstTrip?.id ?? "");
+  const [driverId, setDriverId] = useState<string>(initial?.driverId ?? firstTrip?.driverIds[0] ?? "");
+  const [otherPayer, setOtherPayer] = useState(travelInitial(initial) && initial!.payerId !== initial!.driverId);
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [amount, setAmount] = useState(initial ? String(initial.amount) : "");
+  const [payerId, setPayerId] = useState<string>(initial?.payerId ?? "");
+  const [mode, setMode] = useState<Burden["mode"]>(initial?.burden.mode ?? "all");
+  const [grades, setGrades] = useState<number[]>(initial?.burden.mode === "filter" ? initial.burden.grades : []);
+  const [genders, setGenders] = useState<Gender[]>(initial?.burden.mode === "filter" ? initial.burden.genders : []);
+  const [picked, setPicked] = useState<string[]>(initial?.burden.mode === "pick" ? initial.burden.memberIds : []);
+  const [note, setNote] = useState(initial?.note ?? "");
 
   const travel = isTravel(category);
   const trip = event.trips.find((t) => t.id === tripId);
   const multiTrip = event.trips.length > 1;
-  const membersOf = (ids: string[]) => data.members.filter((m) => ids.includes(m.id));
-  // 運転した人の候補。移動が1つなら運転手 → ほかの部員、複数なら移動ごとに運転手 → 乗った人
-  const driverGroups = event.trips.flatMap((t) => [
-    { trip: t, label: multiTrip ? `${t.name}：運転手` : "運転手", members: membersOf(t.driverIds) },
-    multiTrip
-      ? { trip: t, label: `${t.name}：乗った人`, members: membersOf(t.riderIds.filter((id) => !t.driverIds.includes(id))) }
-      : { trip: t, label: t.driverIds.length > 0 ? "ほかの部員" : "部員", members: data.members.filter((m) => !t.driverIds.includes(m.id) && (isActive(m) || t.riderIds.includes(m.id))) },
-  ]);
-  const categories = event.trips.length > 0 || travelInitial(base) ? CATEGORIES : CATEGORIES.filter((c) => !isTravel(c));
+  const categories = event.trips.length > 0 || travelInitial(initial) ? CATEGORIES : CATEGORIES.filter((c) => !isTravel(c));
   const payerChoices = data.members.filter((m) => isActive(m) || m.id === payerId);
   const yenAmount = Math.round(Number(amount.replace(/[,，¥円\s]/g, "")));
   const burden: Burden =
     travel || mode === "all" ? { mode: "all" } : mode === "filter" ? { mode, grades, genders } : { mode, memberIds: picked };
   const draft: Expense = {
-    id: base?.id ?? newId(),
+    id: initial?.id ?? newId(),
     eventId: event.id,
     category,
     tripId: travel ? tripId || null : null,
@@ -108,17 +95,7 @@ export function ExpenseForm({
               className={driverId ? "" : "unset"}
             >
               <option value="">選んでください</option>
-              {driverGroups
-                .filter((g) => g.members.length > 0)
-                .map((g) => (
-                  <optgroup key={g.label} label={g.label}>
-                    {g.members.map((m) => (
-                      <option key={m.id} value={`${g.trip.id}|${m.id}`}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
+              <DriverOptions data={data} event={event} />
             </select>
           </label>
         )}
