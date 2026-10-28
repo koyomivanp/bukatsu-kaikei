@@ -2,12 +2,12 @@ import { useState } from "react";
 import { Collections } from "./Collections.tsx";
 import { ExpenseForm } from "./ExpenseForm.tsx";
 import { PeoplePanel } from "./PeoplePanel.tsx";
-import { autoMatch, receiptLabel, receiptsOf } from "./receipts.ts";
+import { autoMatch, draftFromReceipt, receiptLabel, receiptsOf } from "./receipts.ts";
 import { Receipts } from "./Receipts.tsx";
 import { SettlementView } from "./SettlementView.tsx";
 import { burdenOf, settle, yen } from "./settle.ts";
-import type { Update } from "./store.ts";
-import { ANNUAL, isTravel, type Burden, type ClubEvent, type Data, type Expense, type Receipt, type Trip } from "./types.ts";
+import { withDriver, type Update } from "./store.ts";
+import { ANNUAL, isTravel, type Burden, type ClubEvent, type Data, type Expense, type Receipt } from "./types.ts";
 
 function burdenLabel(expense: Expense, event: ClubEvent): string {
   if (isTravel(expense.category)) {
@@ -35,7 +35,9 @@ function ReceiptNote({ receipts, amount }: { receipts: Receipt[]; amount: number
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 
 export function EventView({ data, update, event, onBack }: { data: Data; update: Update; event: ClubEvent; onBack: () => void }) {
-  const [editing, setEditing] = useState<Expense | "new" | null>(null);
+  // 「新規」「既存の支出の編集」「レシートから作る」のどれか
+  const [editing, setEditing] = useState<Expense | "new" | { draft: Expense; receiptId: string } | null>(null);
+  const fromReceipt = editing !== null && editing !== "new" && "draft" in editing ? editing : null;
   const annual = event.id === ANNUAL;
   const expenses = data.expenses.filter((x) => x.eventId === event.id);
   const result = settle(data, [event.id]);
@@ -44,19 +46,15 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
   const patchEvent = (patch: Partial<ClubEvent>) =>
     update((d) => ({ ...d, events: d.events.map((e) => (e.id === event.id ? { ...e, ...patch } : e)) }));
 
-  const saveExpense = (expense: Expense) => {
-    const driver = expense.driverId;
-    // 運転した人は、その移動の乗車・運転手にも入れる
-    const withDriver = (t: Trip): Trip =>
-      !driver || t.id !== expense.tripId || t.driverIds.includes(driver)
-        ? t
-        : { ...t, riderIds: t.riderIds.includes(driver) ? t.riderIds : [...t.riderIds, driver], driverIds: [...t.driverIds, driver] };
+  /** 保存して、レシートから作った支出ならそのレシートに結びつける */
+  const saveExpense = (expense: Expense, receiptId: string | null) => {
     update((d) =>
       autoMatch(
         {
           ...d,
-          events: d.events.map((e) => (e.id === event.id ? { ...e, trips: e.trips.map(withDriver) } : e)),
+          events: d.events.map((e) => withDriver(e, expense)),
           expenses: d.expenses.some((x) => x.id === expense.id) ? d.expenses.map((x) => (x.id === expense.id ? expense : x)) : [...d.expenses, expense],
+          receipts: d.receipts.map((r) => (r.id === receiptId ? { ...r, expenseId: expense.id } : r)),
         },
         event.id,
       ),
@@ -118,11 +116,12 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
         </div>
         {editing && (
           <ExpenseForm
-            key={editing === "new" ? "new" : editing.id}
+            key={editing === "new" ? "new" : fromReceipt ? fromReceipt.draft.id : (editing as Expense).id}
             data={data}
             event={event}
-            initial={editing === "new" ? null : editing}
-            onSave={saveExpense}
+            initial={editing === "new" || fromReceipt ? null : (editing as Expense)}
+            prefill={fromReceipt?.draft ?? null}
+            onSave={(expense) => saveExpense(expense, fromReceipt?.receiptId ?? null)}
             onCancel={() => setEditing(null)}
           />
         )}
@@ -191,11 +190,16 @@ export function EventView({ data, update, event, onBack }: { data: Data; update:
 
       <Collections data={data} update={update} event={event} />
 
-      <Receipts data={data} update={update} event={event} />
+      <Receipts
+        data={data}
+        update={update}
+        event={event}
+        onCreateExpense={(receipt) => setEditing({ draft: draftFromReceipt(data, event, receipt), receiptId: receipt.id })}
+      />
 
       <SettlementView
-        data={data}
         result={result}
+        shareTitle={`${event.name}の精算`}
         settled={data.settled[event.id] ?? []}
         onToggleSettled={(id) =>
           update((d) => ({ ...d, settled: { ...d.settled, [event.id]: toggle(d.settled[event.id] ?? [], id) } }))

@@ -126,7 +126,7 @@ export function Collections({ data, update, event }: { data: Data; update: Updat
         </button>
       </div>
       <p className="hint no-print">
-        合宿費などを先に集めたときや、集めたお金から返したときに記録します。精算に入るので、集めすぎた分は下の「お金の受け渡し」で預かった人から返す形になります。
+        合宿費などを先に集めたときや、集めたお金から返したときに記録します。精算に入るので、集めすぎた分は下の精算で「受け取る」として出てきます。
       </p>
       {editing && (
         <CollectionForm

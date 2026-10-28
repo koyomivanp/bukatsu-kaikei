@@ -1,21 +1,41 @@
-import { yen, type Settlement } from "./settle.ts";
-import type { Data } from "./types.ts";
+import { useState } from "react";
+import { settlementText, yen, type Settlement } from "./settle.ts";
+
+/** クリップボードにコピーする。使えないブラウザでは選択してコピーする */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = text;
+    document.body.append(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    area.remove();
+    return ok;
+  }
+}
 
 export function SettlementView({
-  data,
   result,
   title = "精算",
+  shareTitle,
   settled,
   onToggleSettled,
 }: {
-  data: Data;
   result: Settlement;
   title?: string;
+  /** LINE に貼る文章の見出し */
+  shareTitle: string;
   settled?: string[];
   onToggleSettled?: (memberId: string) => void;
 }) {
+  const [copied, setCopied] = useState<"" | "ok" | "ng">("");
   const hasCollections = result.lines.some((l) => l.collected !== 0);
-  const nameOf = (id: string) => data.members.find((m) => m.id === id)?.name ?? "（削除済み）";
+  // 精算済みの人は載せないので、あとから「まだの人」への催促にも使える
+  const open = result.lines.filter((l) => !settled?.includes(l.member.id));
+  const text = settlementText(shareTitle, open);
 
   return (
     <div className="card">
@@ -25,7 +45,7 @@ export function SettlementView({
           {w}
         </p>
       ))}
-      <table>
+      <table className="settlement">
         <thead>
           <tr>
             <th>名前</th>
@@ -60,17 +80,24 @@ export function SettlementView({
         {hasCollections && "「集金・返金」は、集金で払った分を「払済」、集めたお金を持っている分（返金した分を除く）を「預かり」としています。"}
       </p>
 
-      {result.transfers.length > 0 && (
-        <>
-          <h4>お金の受け渡し（最少回数）</h4>
-          <ul className="transfers">
-            {result.transfers.map((t, i) => (
-              <li key={i}>
-                {nameOf(t.from)} → {nameOf(t.to)}　<strong>{yen(t.amount)}</strong>
-              </li>
-            ))}
-          </ul>
-        </>
+      {result.lines.length > 0 && (
+        <div className="share no-print">
+          <div className="row spread">
+            <h4>LINEで知らせる</h4>
+            <button
+              type="button"
+              onClick={async () => {
+                setCopied((await copyText(text)) ? "ok" : "ng");
+                setTimeout(() => setCopied(""), 2500);
+              }}
+            >
+              {copied === "ok" ? "コピーしました" : "文章をコピー"}
+            </button>
+          </div>
+          {copied === "ng" && <p className="warning">コピーできませんでした。下の文章を選んでコピーしてください。</p>}
+          <pre className="share-text">{text}</pre>
+          {settled && settled.length > 0 && <p className="hint">精算済みにした人は載せていません。</p>}
+        </div>
       )}
     </div>
   );

@@ -2,13 +2,11 @@ import { ANNUAL, isActive, isTravel, type ClubEvent, type Data, type Expense, ty
 
 /** collected は集金で払った分（プラス）と、預かった分・返金を受けた分（マイナス）の合計 */
 export type Line = { member: Member; owed: number; paid: number; collected: number; net: number };
-export type Transfer = { from: string; to: string; amount: number };
 export type Settlement = {
   total: number;
   /** 立て替えた人・負担する人が決まらず、精算に入れていない金額 */
   excluded: number;
   lines: Line[];
-  transfers: Transfer[];
   warnings: string[];
 };
 
@@ -103,27 +101,18 @@ export function settle(data: Data, eventIds: string[]): Settlement {
       const c = collected.get(member.id) ?? 0;
       return { member, owed: o, paid: p, collected: c, net: p - o + c };
     });
-  return { total, excluded, lines, transfers: transfersFor(lines.map((l) => ({ id: l.member.id, net: l.net }))), warnings };
+  return { total, excluded, lines, warnings };
 }
 
-/** 払う人から受け取る人へ、なるべく少ない回数で済む送金の組み合わせ */
-export function transfersFor(parties: { id: string; net: number }[]): Transfer[] {
-  const debtors = parties.filter((p) => p.net < 0).map((p) => ({ id: p.id, left: -p.net }));
-  const creditors = parties.filter((p) => p.net > 0).map((p) => ({ id: p.id, left: p.net }));
-  debtors.sort((a, b) => b.left - a.left);
-  creditors.sort((a, b) => b.left - a.left);
-  const out: Transfer[] = [];
-  let i = 0;
-  let j = 0;
-  while (i < debtors.length && j < creditors.length) {
-    const amount = Math.min(debtors[i].left, creditors[j].left);
-    if (amount > 0) out.push({ from: debtors[i].id, to: creditors[j].id, amount });
-    debtors[i].left -= amount;
-    creditors[j].left -= amount;
-    if (debtors[i].left === 0) i++;
-    if (creditors[j].left === 0) j++;
-  }
-  return out;
+/** LINE などに貼る精算のお知らせ。お金は会計がまとめて受け取り・返すので、誰から誰へではなく払う人と受け取る人の一覧にする */
+export function settlementText(title: string, lines: Line[]): string {
+  const pay = lines.filter((l) => l.net < 0);
+  const get = lines.filter((l) => l.net > 0);
+  const out = [`【${title}】`];
+  if (pay.length > 0) out.push("", "▼会計に払う人", ...pay.map((l) => `・${l.member.name}　${yen(-l.net)}`));
+  if (get.length > 0) out.push("", "▼会計から受け取る人", ...get.map((l) => `・${l.member.name}　${yen(l.net)}`));
+  if (pay.length + get.length === 0) out.push("", "払う人・受け取る人はいません。");
+  return out.join("\n");
 }
 
 export function labelOf(expense: Expense): string {

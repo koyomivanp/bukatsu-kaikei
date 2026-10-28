@@ -30,6 +30,8 @@ export function RosterImport({ data, update }: { data: Data; update: Update }) {
     }
   };
 
+  const unsetGender = plan?.added.filter((_, i) => (genders[i] ?? "未設定") === "未設定") ?? [];
+
   const close = () => {
     setPlan(null);
     setSource("");
@@ -168,11 +170,18 @@ export function RosterImport({ data, update }: { data: Data; update: Update }) {
             </>
           )}
 
+          {unsetGender.length > 0 && (
+            <p className="warning">
+              性別を選んでいない人が{unsetGender.length}人います（{unsetGender.map((r) => r.name).join("、")}）。
+              このままだと「男だけ」「女だけ」や「男子のみ」の割り勘から外れます。
+            </p>
+          )}
           <div className="row" style={{ marginTop: 12 }}>
             <button
               type="button"
               className="primary"
               onClick={() => {
+                if (unsetGender.length > 0 && !confirm(`性別を選んでいない人が${unsetGender.length}人います。性別は未設定のまま反映しますか？\n（あとから名簿で設定できます）`)) return;
                 update((d) => ({ ...d, members: applyImport(d.members, plan, genders, missingChoices, newId) }));
                 close();
               }}

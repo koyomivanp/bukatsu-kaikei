@@ -1,4 +1,6 @@
-import type { Data, Expense, Receipt } from "./types.ts";
+import { participantsOf } from "./settle.ts";
+import { newId, withDriver } from "./store.ts";
+import { CATEGORIES, isActive, isTravel, type Category, type ClubEvent, type Data, type Expense, type Member, type Receipt, type Trip } from "./types.ts";
 
 /** レシート読み取りに使うモデル。読み取りだけなので安くて速いものにする */
 export const RECEIPT_MODEL = "claude-haiku-5-5";
@@ -23,7 +25,7 @@ export function saveApiKey(key: string) {
   }
 }
 
-export type ReceiptReading = Pick<Receipt, "store" | "date" | "amount" | "summary">;
+export type ReceiptReading = Pick<Receipt, "store" | "date" | "amount" | "summary" | "category" | "payerNote">;
 
 const TOOL = {
   name: "record_receipt",
@@ -35,8 +37,19 @@ const TOOL = {
       date: { type: "string", description: "日付を YYYY-MM-DD で。読めなければ空文字" },
       amount: { type: ["integer", "null"], description: "支払った合計金額（税込・円）。お預かりやお釣りではない。読めなければ null" },
       summary: { type: "string", description: "何を買ったかの短い要約（15文字程度）。例：ガソリン 30L、飲み物・お菓子" },
+      category: {
+        type: "string",
+        enum: CATEGORIES,
+        description: "高速道路・有料道路の料金なら「高速」、ガソリンスタンドでの給油なら「ガソリン」、それ以外は「雑費」",
+      },
+      payer: {
+        type: "string",
+        description:
+          "レシートの余白・裏・付箋などに手書きや印字で「田中先払い」「田中立替」「田中払い」のように、印刷された店の情報とは別に書き込まれた立て替えた人の名前。" +
+          "名前の部分だけ（例：田中）。書き込みがなければ空文字。店員名やカード名義は含めない",
+      },
     },
-    required: ["store", "date", "amount", "summary"],
+    required: ["store", "date", "amount", "summary", "category", "payer"],
   },
 };
 
@@ -103,6 +116,84 @@ export async function readReceipt(file: File, apiKey: string): Promise<ReceiptRe
     date: /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : "",
     amount: input.amount !== null && Number.isFinite(amount) && amount > 0 ? Math.round(amount) : null,
     summary: String(input.summary ?? "").trim(),
+    category: CATEGORIES.find((c) => c === input.category) ?? "雑費",
+    payerNote: cleanName(String(input.payer ?? "")),
+  };
+}
+
+const squash = (s: string) => s.replace(/[\s　・]/g, "");
+
+/** 「田中先輩 先払い」のような書き込みから、名前の部分だけ残す */
+export function cleanName(note: string): string {
+  return squash(note)
+    .replace(/(先払い|先払|立て替え|立替え|立替|建て替え|建替|払い|払|より|から|分)$/, "")
+    .replace(/(さん|先輩|くん|君|ちゃん)$/, "");
+}
+
+/**
+ * 書かれた名前に合う部員。名字だけ・名前だけでもよい。
+ * 会計の参加者 → 在籍中の部員の順に探し、1人に決まったときだけ返す。
+ */
+export function findPayer(data: Data, event: ClubEvent, note: string): Member | null {
+  const name = cleanName(note);
+  if (!name) return null;
+  for (const pool of [participantsOf(data, event), data.members.filter(isActive)]) {
+    const exact = pool.filter((m) => squash(m.name) === name);
+    if (exact.length === 1) return exact[0];
+    const part = pool.filter((m) => squash(m.name).startsWith(name) || squash(m.name).endsWith(name));
+    if (part.length === 1) return part[0];
+    if (exact.length + part.length > 1) return null;
+  }
+  return null;
+}
+
+/** 立て替えた人が運転した車。運転手 → 乗った人 → 車が1つだけ、の順に、1つに決まれば返す */
+function tripOf(event: ClubEvent, memberId: string | null): Trip | null {
+  if (memberId) {
+    const drove = event.trips.filter((t) => t.driverIds.includes(memberId));
+    if (drove.length === 1) return drove[0];
+    const rode = event.trips.filter((t) => t.riderIds.includes(memberId));
+    if (drove.length === 0 && rode.length === 1) return rode[0];
+  }
+  return event.trips.length === 1 ? event.trips[0] : null;
+}
+
+/** レシートから作る支出の下書き。高速・ガソリンは立て替えた人が運転したものとする */
+export function draftFromReceipt(data: Data, event: ClubEvent, receipt: Receipt): Expense {
+  const payer = findPayer(data, event, receipt.payerNote);
+  const category: Category = isTravel(receipt.category) && event.trips.length > 0 ? receipt.category : "雑費";
+  const travel = isTravel(category);
+  const trip = travel ? (tripOf(event, payer?.id ?? null) ?? event.trips[0]) : null;
+  return {
+    id: newId(),
+    eventId: event.id,
+    category,
+    tripId: trip?.id ?? null,
+    driverId: travel ? (payer?.id ?? null) : null,
+    title: travel ? "" : receipt.summary,
+    amount: receipt.amount ?? 0,
+    payerId: payer?.id ?? null,
+    burden: { mode: "all" },
+    note: receipt.store,
+  };
+}
+
+/**
+ * 立て替えた人が書いてあり、どの支出とも結びつかなかったレシートから、支出を作って結びつける。
+ * 金額が読めない・名前が1人に決まらない・どの車か決まらないものは、手で作ってもらうため残す。
+ */
+export function createFromReceipt(data: Data, receiptId: string): Data {
+  const receipt = data.receipts.find((r) => r.id === receiptId);
+  const event = data.events.find((e) => e.id === receipt?.eventId);
+  if (!receipt || !event || receipt.expenseId !== null || receipt.amount === null || !receipt.payerNote) return data;
+  const expense = draftFromReceipt(data, event, receipt);
+  if (expense.payerId === null) return data;
+  if (isTravel(expense.category) && tripOf(event, expense.payerId) === null) return data;
+  return {
+    ...data,
+    events: data.events.map((e) => withDriver(e, expense)),
+    expenses: [...data.expenses, expense],
+    receipts: data.receipts.map((r) => (r.id === receipt.id ? { ...r, expenseId: expense.id } : r)),
   };
 }
 

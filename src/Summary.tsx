@@ -83,7 +83,11 @@ export function Summary({ data }: { data: Data }) {
         </table>
       </div>
 
-      <SettlementView data={data} result={all} title={`まとめて精算する場合（${selected.map((e) => e.name).join("・") || "会計を選んでください"}）`} />
+      <SettlementView
+        result={all}
+        title={`まとめて精算する場合（${selected.map((e) => e.name).join("・") || "会計を選んでください"}）`}
+        shareTitle={`${selected.map((e) => e.name).join("・")}の精算`}
+      />
     </section>
   );
 }

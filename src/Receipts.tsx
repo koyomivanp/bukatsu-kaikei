@@ -1,11 +1,23 @@
-import { useState } from "react";
-import { autoMatch, isReadable, loadApiKey, readReceipt, receiptLabel, saveApiKey } from "./receipts.ts";
+import { useRef, useState } from "react";
+import { autoMatch, createFromReceipt, findPayer, isReadable, loadApiKey, readReceipt, receiptLabel, saveApiKey } from "./receipts.ts";
 import { labelOf, yen } from "./settle.ts";
 import { newId, type Update } from "./store.ts";
 import type { ClubEvent, Data, Receipt } from "./types.ts";
 
-export function Receipts({ data, update, event }: { data: Data; update: Update; event: ClubEvent }) {
+export function Receipts({
+  data,
+  update,
+  event,
+  onCreateExpense,
+}: {
+  data: Data;
+  update: Update;
+  event: ClubEvent;
+  onCreateExpense: (receipt: Receipt) => void;
+}) {
   const [apiKey, setApiKey] = useState(loadApiKey);
+  // 今回の読み込みで支出を自動で作ったレシート（更新の計算の中で記録するので、何度呼ばれても同じになる Set にする）
+  const created = useRef(new Set<string>());
   const [progress, setProgress] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
   const receipts = data.receipts.filter((r) => r.eventId === event.id);
@@ -13,6 +25,8 @@ export function Receipts({ data, update, event }: { data: Data; update: Update; 
   const unmatched = receipts.filter((r) => r.expenseId === null);
   const linkedExpenses = new Set(receipts.map((r) => r.expenseId));
   const withoutReceipt = expenses.filter((x) => !linkedExpenses.has(x.id));
+
+  const payerOf = (r: Receipt) => findPayer(data, event, r.payerNote);
 
   const patch = (id: string, change: Partial<Receipt>) =>
     update((d) => ({ ...d, receipts: d.receipts.map((r) => (r.id === id ? { ...r, ...change } : r)) }));
@@ -26,12 +40,18 @@ export function Receipts({ data, update, event }: { data: Data; update: Update; 
       return isReadable(f);
     });
     if (files.length > 0 && todo.length === 0 && problems.length === 0) problems.push("選んだレシートはすべて読み込み済みです。");
+    created.current = new Set();
     for (const [i, file] of todo.entries()) {
       setProgress(`読み取り中… ${i + 1} / ${todo.length}（${file.name}）`);
       try {
         const reading = await readReceipt(file, apiKey);
         const receipt: Receipt = { id: newId(), eventId: event.id, fileName: file.name, fileSize: file.size, expenseId: null, ...reading };
-        update((d) => autoMatch({ ...d, receipts: [...d.receipts, receipt] }, event.id));
+        // 同じ金額の支出があれば結びつけ、なければ書いてある立て替えた人で支出を作る
+        update((d) => {
+          const next = createFromReceipt(autoMatch({ ...d, receipts: [...d.receipts, receipt] }, event.id), receipt.id);
+          if (next.expenses.length > d.expenses.length) created.current.add(receipt.id);
+          return next;
+        });
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         problems.push(`${file.name}：${message === "Failed to fetch" ? "通信できませんでした。" : message}`);
@@ -54,7 +74,8 @@ export function Receipts({ data, update, event }: { data: Data; update: Update; 
       </div>
       <p className="hint">
         レシートの写真（JPEG・PNG）や PDF をまとめて選ぶと、AI が店名・日付・合計金額を読み取り、同じ金額の支出に自動で結びつけます。
-        画像はこのアプリには保存されず、読み取った内容だけが残ります。
+        同じ金額の支出がなくても、レシートに「田中先払い」のように立て替えた人が書いてあれば、その人が立て替えた支出を自動で作ります
+        （高速・ガソリンはその人が運転したことになります）。画像はこのアプリには保存されず、読み取った内容だけが残ります。
       </p>
 
       <details className="api-key" open={!apiKey}>
@@ -95,6 +116,11 @@ export function Receipts({ data, update, event }: { data: Data; update: Update; 
         </label>
         {progress && <span className="hint">{progress}</span>}
       </div>
+      {created.current.size > 0 && !progress && (
+        <p className="notice">
+          立て替えた人が書いてあったレシート{created.current.size}枚から、支出を作りました。上の「支出」で金額や負担する人を確かめてください。
+        </p>
+      )}
       {errors.map((e) => (
         <p key={e} className="warning">
           {e}
@@ -124,6 +150,12 @@ export function Receipts({ data, update, event }: { data: Data; update: Update; 
                       {r.summary && " ・ "}
                       {r.fileName}
                     </div>
+                    {r.payerNote && (
+                      <div className="hint">
+                        書き込み：{r.payerNote}
+                        {payerOf(r) ? `（→ ${payerOf(r)!.name}）` : "（名簿の誰か決められません）"}
+                      </div>
+                    )}
                   </td>
                   <td>{r.date || "—"}</td>
                   <td className="num">
@@ -139,6 +171,7 @@ export function Receipts({ data, update, event }: { data: Data; update: Update; 
                     />
                   </td>
                   <td>
+                    {created.current.has(r.id) && <span className="tag">自動で作成</span>}
                     <select value={r.expenseId ?? ""} onChange={(e) => patch(r.id, { expenseId: e.target.value || null })} className={expense ? "" : "unset"}>
                       <option value="">結びつけない</option>
                       {expenses.map((x) => (
@@ -149,7 +182,12 @@ export function Receipts({ data, update, event }: { data: Data; update: Update; 
                       ))}
                     </select>
                   </td>
-                  <td>
+                  <td className="actions">
+                    {!expense && (
+                      <button type="button" className="small" onClick={() => onCreateExpense(r)}>
+                        支出を作る
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="danger small"

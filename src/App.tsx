@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Backup } from "./Backup.tsx";
+import { Backup, BackupReminder } from "./Backup.tsx";
 import { EventList } from "./EventList.tsx";
 import { EventView } from "./EventView.tsx";
 import { Members } from "./Members.tsx";
@@ -16,7 +16,7 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export function App() {
-  const [data, update, replace] = useData();
+  const [data, update, replace, backup] = useData();
   const [tab, setTab] = useState<Tab>("events");
   const [openEvent, setOpenEvent] = useState<string | null>(null);
   const event = data.events.find((e) => e.id === openEvent);
@@ -41,12 +41,13 @@ export function App() {
           ))}
         </nav>
       </header>
+      <BackupReminder data={data} backup={backup} />
       <main>
         {tab === "events" && event && <EventView data={data} update={update} event={event} onBack={() => setOpenEvent(null)} />}
         {tab === "events" && !event && <EventList data={data} update={update} onOpen={setOpenEvent} />}
         {tab === "members" && <Members data={data} update={update} />}
         {tab === "summary" && <Summary data={data} />}
-        {tab === "backup" && <Backup data={data} replace={replace} />}
+        {tab === "backup" && <Backup data={data} replace={replace} backup={backup} />}
       </main>
     </div>
   );

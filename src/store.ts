@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ANNUAL, type ClubEvent, type Data, type Expense, type Member, type Trip } from "./types.ts";
+import { ANNUAL, type ClubEvent, type Data, type Expense, type Member, type Receipt, type Trip } from "./types.ts";
 
 const KEY = "bukatsu-kaikei:v1";
 
@@ -16,6 +16,20 @@ type OldMember = Partial<Member> & { retired?: boolean };
 /** 会計を作ったときの移動。最初は対象の部員が全員乗っていることにする */
 export function defaultTrip(id: string, riderIds: string[]): Trip {
   return { id, name: "車", riderIds, driverIds: [] };
+}
+
+/** 高速・ガソリンを運転した人を、その車の乗車・運転手にも入れる */
+export function withDriver(event: ClubEvent, expense: Expense): ClubEvent {
+  const driver = expense.driverId;
+  if (!driver || expense.eventId !== event.id) return event;
+  return {
+    ...event,
+    trips: event.trips.map((t) =>
+      t.id !== expense.tripId || t.driverIds.includes(driver)
+        ? t
+        : { ...t, riderIds: t.riderIds.includes(driver) ? t.riderIds : [...t.riderIds, driver], driverIds: [...t.driverIds, driver] },
+    ),
+  };
 }
 
 /** 読み込んだデータの欠けを補い、古い形式（運転手が会計ごとに1組、引退チェック）を今の形に直す。通年は常に先頭。 */
@@ -60,7 +74,8 @@ export function normalize(raw: Partial<Omit<Data, "version">>): Data {
   if (!events.some((e) => e.id === ANNUAL)) {
     events.unshift({ id: ANNUAL, name: "通年（全期間）", participantIds: [], trips: [] });
   }
-  return { version: 2, members, events, expenses, receipts: base.receipts, collections: base.collections, settled: base.settled };
+  const receipts: Receipt[] = base.receipts.map((r) => ({ ...r, category: r.category ?? "雑費", payerNote: r.payerNote ?? "" }));
+  return { version: 2, members, events, expenses, receipts, collections: base.collections, settled: base.settled };
 }
 
 /** その部員が記録に出てくる回数（立て替え・運転・個別指定・対象・乗車） */
@@ -105,9 +120,35 @@ function load(): Data {
   return normalize({});
 }
 
-export function useData(): [Data, Update, (data: Data) => void] {
+const BACKUP_KEY = "bukatsu-kaikei:backup";
+
+/** バックアップの状態。会計データとは別に保存するので、バックアップ自体には含まれない */
+export type BackupState = {
+  /** 最後にバックアップを書き出した日時 */
+  lastBackup: number | null;
+  /** バックアップしていない変更のうち、いちばん古いものの日時 */
+  unsavedSince: number | null;
+};
+
+function loadBackupState(): BackupState {
+  try {
+    const raw = localStorage.getItem(BACKUP_KEY);
+    if (raw) return { lastBackup: null, unsavedSince: null, ...JSON.parse(raw) };
+  } catch {
+    // 読めなければ、まだ一度も書き出していないことにする
+  }
+  return { lastBackup: null, unsavedSince: null };
+}
+
+export type Backup = BackupState & {
+  /** バックアップを書き出した・バックアップから復元したときに呼ぶ */
+  saved: (exported: boolean) => void;
+};
+
+export function useData(): [Data, Update, (data: Data) => void, Backup] {
   const [data, setData] = useState(load);
   const [saveError, setSaveError] = useState(false);
+  const [backup, setBackup] = useState(loadBackupState);
   useEffect(() => {
     try {
       localStorage.setItem(KEY, JSON.stringify(data));
@@ -117,9 +158,21 @@ export function useData(): [Data, Update, (data: Data) => void] {
     }
   }, [data]);
   useEffect(() => {
+    try {
+      localStorage.setItem(BACKUP_KEY, JSON.stringify(backup));
+    } catch {
+      // 保存できなくても、開いている間は使える
+    }
+  }, [backup]);
+  useEffect(() => {
     if (saveError) alert("ブラウザへの保存に失敗しました。バックアップを書き出してください。");
   }, [saveError]);
-  return [data, (fn) => setData((d) => fn(d)), (next) => setData(normalize(next))];
+  const update: Update = (fn) => {
+    setData((d) => fn(d));
+    setBackup((b) => (b.unsavedSince === null ? { ...b, unsavedSince: Date.now() } : b));
+  };
+  const saved = (exported: boolean) => setBackup((b) => ({ lastBackup: exported ? Date.now() : b.lastBackup, unsavedSince: null }));
+  return [data, update, (next) => setData(normalize(next)), { ...backup, saved }];
 }
 
 export function newId(): string {

@@ -32,6 +32,9 @@ export function PeoplePanel({ data, update, event }: { data: Data; update: Updat
   const stateOf = (m: Member) =>
     trip ? (trip.driverIds.includes(m.id) ? "drive" : trip.riderIds.includes(m.id) ? "on" : "off") : event.participantIds.includes(m.id) ? "on" : "off";
 
+  // 性別が未設定の人は「男だけ」「女だけ」でどちらからも外れるので知らせる
+  const unsetGender = shown.filter((m) => m.gender === "未設定" && stateOf(m) !== "off");
+
   // 今選んでいる人のうち、その性別の人だけ残す（「1〜3年」→「男だけ」で1〜3年の男子）
   const onlyGender = (g: Gender) => {
     const keep = (ids: string[]) => ids.filter((id) => data.members.find((m) => m.id === id)?.gender === g);
@@ -123,6 +126,7 @@ export function PeoplePanel({ data, update, event }: { data: Data; update: Updat
           {trip
             ? `名前を押すたびに「乗らない → 乗車 → 運転」と切り替わります。高速・ガソリンは乗車 ${trip.riderIds.length}人から運転手 ${trip.driverIds.length}人を除いた ${trip.riderIds.length - trip.driverIds.length}人で割ります。`
             : "名前を押して参加者を切り替えます。雑費は「イベント参加者」で割ります（4年生以上は最初は外れています）。"}
+          {unsetGender.length > 0 && <span className="caution">　性別が未設定の{unsetGender.map((m) => m.name).join("、")}は、「男だけ」「女だけ」を押すと外れます（名簿で設定できます）。</span>}
         </p>
 
         <div className="grade-rows">
