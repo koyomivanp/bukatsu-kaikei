@@ -73,6 +73,7 @@ const old = normalize({
 check("旧データ：運転手つきの会計は移動1つに変換", old.events[1].trips.length === 1 && old.events[1].trips[0].driverIds[0] === "A");
 check("旧データ：運転手免除の支出はガソリン＋その移動に変換", old.expenses[0].category === "ガソリン" && old.expenses[0].tripId === old.events[1].trips[0].id);
 check("旧データ：通年が先頭に追加される", old.events[0].id === ANNUAL);
+check("旧データ：初期名「移動」は「車」に直す", old.events[1].trips[0].name === "車" && normalize({ events: [{ id: "e", name: "", participantIds: [], trips: [{ id: "t", name: "移動②", riderIds: [], driverIds: [] }, { id: "u", name: "①合宿", riderIds: [], driverIds: [] }] }] }).events[1].trips.map((t) => t.name).join() === "車②,①合宿");
 check("旧データ：運転手が立て替えた交通費は、その人が運転者になる", old.expenses[0].driverId === "A");
 // t1 の運転手は C だけ。支出で運転者に B を選ぶと、その支出は B も外して割る
 const byB = { ...x("7", "camp", "高速", "t1", 1000, "B"), driverId: "B" };

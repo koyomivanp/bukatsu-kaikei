@@ -15,7 +15,7 @@ type OldMember = Partial<Member> & { retired?: boolean };
 
 /** 会計を作ったときの移動。最初は対象の部員が全員乗っていることにする */
 export function defaultTrip(id: string, riderIds: string[]): Trip {
-  return { id, name: "移動", riderIds, driverIds: [] };
+  return { id, name: "車", riderIds, driverIds: [] };
 }
 
 /** 読み込んだデータの欠けを補い、古い形式（運転手が会計ごとに1組、引退チェック）を今の形に直す。通年は常に先頭。 */
@@ -32,9 +32,11 @@ export function normalize(raw: Partial<Omit<Data, "version">>): Data {
     ...(m.faculty ? { faculty: m.faculty } : {}),
   }));
   const events: ClubEvent[] = (base.events as OldEvent[]).map((e) => {
-    let trips = e.trips ?? (e.driverIds?.length ? [{ id: `${e.id}-trip`, name: "移動", riderIds: e.participantIds ?? [], driverIds: e.driverIds }] : []);
-    // 通年以外の会計には、高速・ガソリン用の移動を必ず1つ置く
+    let trips = e.trips ?? (e.driverIds?.length ? [{ id: `${e.id}-trip`, name: "車", riderIds: e.participantIds ?? [], driverIds: e.driverIds }] : []);
+    // 通年以外の会計には、高速・ガソリン用の車を必ず1つ置く
     if (trips.length === 0 && e.id !== ANNUAL) trips = [defaultTrip(`${e.id}-trip`, e.participantIds ?? [])];
+    // 以前の初期名「移動」「移動②」は「車」「車②」に直す（「移動に乗った人」は日本語として不自然なため）
+    trips = trips.map((t) => (/^移動([①-⑨]|\d+)?$/.test(t.name) ? { ...t, name: t.name.replace("移動", "車") } : t));
     return { id: e.id!, name: e.name ?? "", participantIds: e.participantIds ?? [], trips };
   });
   const expenses: Expense[] = (base.expenses as OldExpense[]).map((x) => {

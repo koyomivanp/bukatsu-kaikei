@@ -5,7 +5,7 @@ import { FILTER_GENDERS, isActive, isDefaultParticipant, type ClubEvent, type Da
 const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 const names = (members: Member[], ids: string[]) => members.filter((m) => ids.includes(m.id)).map((m) => m.name).join("、") || "なし";
 
-/** 会計の参加者と、移動ごとの乗車・運転を、学年ごとに並べた名前ボタンで切り替える */
+/** 会計の参加者と、車ごとの乗車・運転を、学年ごとに並べた名前ボタンで切り替える */
 export function PeoplePanel({ data, update, event }: { data: Data; update: Update; event: ClubEvent }) {
   const [tab, setTab] = useState<string>("target");
   const [showInactive, setShowInactive] = useState(false);
@@ -52,13 +52,13 @@ export function PeoplePanel({ data, update, event }: { data: Data; update: Updat
 
   const addTrip = () => {
     const id = newId();
-    patchEvent({ trips: [...event.trips, { id, name: `移動${"①②③④⑤⑥⑦⑧⑨"[event.trips.length] ?? event.trips.length + 1}`, riderIds: [], driverIds: [] }] });
+    patchEvent({ trips: [...event.trips, { id, name: `車${"①②③④⑤⑥⑦⑧⑨"[event.trips.length] ?? event.trips.length + 1}`, riderIds: [], driverIds: [] }] });
     setTab(id);
   };
   const removeTrip = (t: Trip) => {
     const used = data.expenses.filter((x) => x.tripId === t.id).length;
     if (used > 0) return alert(`「${t.name}」には支出が${used}件あります。先に支出の運転した人を変えるか削除してください。`);
-    if (event.trips.length === 1) return alert("高速・ガソリンを割るのに使うので、最後の移動は消せません。");
+    if (event.trips.length === 1) return alert("高速・ガソリンを割るのに使うので、最後の車は消せません。");
     if (!confirm(`「${t.name}」を削除しますか？`)) return;
     patchEvent({ trips: event.trips.filter((x) => x.id !== t.id) });
     setTab("target");
@@ -66,7 +66,7 @@ export function PeoplePanel({ data, update, event }: { data: Data; update: Updat
 
   return (
     <div className="card">
-      <h3>部員と移動</h3>
+      <h3>参加者と車</h3>
 
       <div className="no-print">
         <div className="people-tabs" role="tablist">
@@ -82,7 +82,7 @@ export function PeoplePanel({ data, update, event }: { data: Data; update: Updat
             </button>
           ))}
           <button type="button" className="add" onClick={addTrip}>
-            ＋ 移動（車）
+            ＋ 車を追加
           </button>
         </div>
 
@@ -98,9 +98,9 @@ export function PeoplePanel({ data, update, event }: { data: Data; update: Updat
               </button>
               {genderButtons}
               <span className="spacer" />
-              <input className="trip-name" value={trip.name} aria-label="移動の名前" onChange={(e) => patchTrip(trip.id, { name: e.target.value })} />
+              <input className="trip-name" value={trip.name} aria-label="車の名前" onChange={(e) => patchTrip(trip.id, { name: e.target.value })} />
               <button type="button" className="danger small" onClick={() => removeTrip(trip)}>
-                この移動を削除
+                この車を削除
               </button>
             </>
           ) : (

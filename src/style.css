@@ -489,7 +489,7 @@ input.amount {
   color: var(--pay);
 }
 
-/* 部員と移動：タブ・まとめて操作・学年ごとの名前ボタン */
+/* 参加者と車：タブ・まとめて操作・学年ごとの名前ボタン */
 .people-tabs {
   display: flex;
   flex-wrap: wrap;

@@ -12,7 +12,7 @@ import { ANNUAL, isTravel, type Burden, type ClubEvent, type Data, type Expense,
 function burdenLabel(expense: Expense, event: ClubEvent): string {
   if (isTravel(expense.category)) {
     const trip = event.trips.find((t) => t.id === expense.tripId);
-    return trip ? `${trip.name}に乗った人（運転手除く）` : "（移動が未選択）";
+    return trip ? `${trip.name}に乗った人（運転手除く）` : "（車が未選択）";
   }
   const burden: Burden = expense.burden;
   if (burden.mode === "all") return event.id === ANNUAL ? "部員全員（在籍中）" : "イベント参加者";
