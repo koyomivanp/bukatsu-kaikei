@@ -2,6 +2,7 @@ import { burdenOf, participantsOf, settle, settlementText, yen } from "./settle.
 import { normalize, removeMember, usageOf } from "./store.ts";
 import { expenseFromRow, missingOf, rowsFromMessages, type MessageItem } from "./messages.ts";
 import { cleanName, findMember } from "./names.ts";
+import { breakdownOf, breakdownText, perPersonText } from "./breakdown.ts";
 import { autoMatch } from "./receipts.ts";
 import { ANNUAL, isDefaultParticipant, type Data, type Expense, type Member, type Receipt } from "./types.ts";
 
@@ -163,5 +164,16 @@ check("メッセージ：車のない通年では雑費にする", rowsFromMessa
 const fromRow = expenseFromRow(campEvent, hw);
 check("メッセージ：支出にすると参加者割り・元のメッセージがメモに残る", fromRow.category === "高速" && fromRow.amount === 2000 && fromRow.burden.mode === "all" && fromRow.note === "q" && fromRow.eventId === "camp");
 check("旧データ：レシートの書き込み欄は落とす", !("payerNote" in normalize({ receipts: [{ ...r("z", 1), payerNote: "田中", category: "雑費" } as never] }).receipts[0]));
+
+// 部員への説明用の支出の内訳
+const [campBreakdown] = breakdownOf(data, ["camp"]);
+const rowOf = (id: string) => campBreakdown.rows.find((r) => r.expense.id === id)!;
+check("内訳：会計の支出をすべて載せ、合計も合う", campBreakdown.rows.length === 6 && campBreakdown.total === 3000 + 3001 + 5000 + 2000 + 500 + 700);
+check("内訳：端数のある1人あたりは幅で出す", perPersonText(rowOf("2")) === "¥1,000〜¥1,001" && perPersonText(rowOf("1")) === "¥1,000" && rowOf("2").count === 3);
+check("内訳：精算に入っていない支出は印をつける", rowOf("6").excluded && rowOf("7").excluded && !rowOf("3").excluded);
+const bText = breakdownText(data, ["camp", ANNUAL], true);
+check("内訳：文章に会計ごとの見出しと立て替え・人数が入る", bText.startsWith("【支出の内訳】夏合宿まで・通年") && bText.includes("■ 夏合宿まで（支出 6件") && bText.includes("立て替え：C／①に乗った人（運転手除く） 3人で割って1人 ¥1,000"));
+check("内訳：一人ずつの負担額は選んだときだけ", bText.includes("▼一人ずつの負担額") && !breakdownText(data, ["camp"], false).includes("▼一人ずつの負担額"));
+check("内訳：個別指定は名前を並べる", breakdownOf({ ...data, expenses: [x("p", "camp", "雑費", null, 900, "A", { mode: "pick", memberIds: ["A", "C"] })] }, ["camp"])[0].rows[0].who === "A・C");
 
 if (failed > 0) throw new Error(`${failed}件の確認に失敗`);

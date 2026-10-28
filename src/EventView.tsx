@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { burdenLabel } from "./breakdown.ts";
 import { Collections } from "./Collections.tsx";
 import { ExpenseForm } from "./ExpenseForm.tsx";
 import { PeoplePanel } from "./PeoplePanel.tsx";
@@ -9,18 +10,7 @@ import { Receipts } from "./Receipts.tsx";
 import { SettlementView } from "./SettlementView.tsx";
 import { burdenOf, settle, yen } from "./settle.ts";
 import { withDriver, type Update } from "./store.ts";
-import { ANNUAL, isTravel, type Burden, type ClubEvent, type Data, type Expense, type Receipt } from "./types.ts";
-
-function burdenLabel(expense: Expense, event: ClubEvent): string {
-  if (isTravel(expense.category)) {
-    const trip = event.trips.find((t) => t.id === expense.tripId);
-    return trip ? `${trip.name}に乗った人（運転手除く）` : "（車が未選択）";
-  }
-  const burden: Burden = expense.burden;
-  if (burden.mode === "all") return event.id === ANNUAL ? "部員全員（在籍中）" : "イベント参加者";
-  if (burden.mode === "pick") return "個別指定";
-  return [burden.grades.map((g) => `${g}年`).join("・"), burden.genders.join("・")].filter(Boolean).join(" / ") + "のみ";
-}
+import { ANNUAL, isTravel, type ClubEvent, type Data, type Expense, type Receipt } from "./types.ts";
 
 /** 支出についたレシート。合計が支出の金額と違えば知らせる */
 function ReceiptNote({ receipts, amount }: { receipts: Receipt[]; amount: number }) {

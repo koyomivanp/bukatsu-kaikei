@@ -1,21 +1,5 @@
-import { useState } from "react";
+import { CopyButton } from "./CopyButton.tsx";
 import { settlementText, yen, type Settlement } from "./settle.ts";
-
-/** クリップボードにコピーする。使えないブラウザでは選択してコピーする */
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    const area = document.createElement("textarea");
-    area.value = text;
-    document.body.append(area);
-    area.select();
-    const ok = document.execCommand("copy");
-    area.remove();
-    return ok;
-  }
-}
 
 export function SettlementView({
   result,
@@ -31,7 +15,6 @@ export function SettlementView({
   settled?: string[];
   onToggleSettled?: (memberId: string) => void;
 }) {
-  const [copied, setCopied] = useState<"" | "ok" | "ng">("");
   const hasCollections = result.lines.some((l) => l.collected !== 0);
   // 精算済みの人は載せないので、あとから「まだの人」への催促にも使える
   const open = result.lines.filter((l) => !settled?.includes(l.member.id));
@@ -84,17 +67,8 @@ export function SettlementView({
         <div className="share no-print">
           <div className="row spread">
             <h4>LINEで知らせる</h4>
-            <button
-              type="button"
-              onClick={async () => {
-                setCopied((await copyText(text)) ? "ok" : "ng");
-                setTimeout(() => setCopied(""), 2500);
-              }}
-            >
-              {copied === "ok" ? "コピーしました" : "文章をコピー"}
-            </button>
+            <CopyButton text={text} />
           </div>
-          {copied === "ng" && <p className="warning">コピーできませんでした。下の文章を選んでコピーしてください。</p>}
           <pre className="share-text">{text}</pre>
           {settled && settled.length > 0 && <p className="hint">精算済みにした人は載せていません。</p>}
         </div>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Breakdown } from "./Breakdown.tsx";
 import { SettlementView } from "./SettlementView.tsx";
 import { settle, yen } from "./settle.ts";
 import { ANNUAL, type Data } from "./types.ts";
@@ -58,6 +59,8 @@ export function Summary({ data }: { data: Data }) {
           </tfoot>
         </table>
       </div>
+
+      <Breakdown data={data} eventIds={selected.map((e) => e.id)} />
 
       <div className="card">
         <h3>まだ精算していない分</h3>
