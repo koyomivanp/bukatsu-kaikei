@@ -432,6 +432,14 @@ table.settlement td:first-child {
   margin-bottom: 16px;
 }
 
+.reminder.demo {
+  background: var(--accent-soft);
+}
+
+.welcome p {
+  margin: 0 0 8px;
+}
+
 .notice {
   background: var(--accent-soft);
   border-radius: 8px;
