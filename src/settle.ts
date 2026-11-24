@@ -78,6 +78,13 @@ export function settle(data: Data, eventIds: string[]): Settlement {
       add(paid, expense.payerId!, expense.amount);
       for (const [memberId, yen] of split(expense.amount, who)) add(owed, memberId, yen);
     }
+    // 運転したのにガソリン代が出ていない人は、登録し忘れの可能性が高い
+    const gasDrivers = new Set(data.expenses.filter((x) => x.eventId === id && x.category === "ガソリン").map((x) => x.driverId));
+    for (const driverId of new Set(event.trips.flatMap((t) => t.driverIds))) {
+      if (gasDrivers.has(driverId)) continue;
+      const name = data.members.find((m) => m.id === driverId)?.name;
+      if (name) warnings.push(`運転手 ${name} のガソリン代が登録されていません（${event.name}）。`);
+    }
   }
 
   for (const c of data.collections.filter((c) => eventIds.includes(c.eventId))) {

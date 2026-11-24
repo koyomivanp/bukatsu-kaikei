@@ -53,7 +53,9 @@ check("①の運転手Cは①のガソリンを負担しない", owed.C === 1000
 check("①に乗っていないEはガソリン①を負担しない", owed.E === 1000);
 check("②の運転手D・Eは②の高速を負担しない", owed.D === 1000 + 1000);
 check("端数は名簿順に上乗せ", owed.A === 1000 + 1001 + 1000 + 1000 && owed.B === 1000 + 1000 + 1000 + 1000);
-check("運転者のない交通費・立て替えのない支出は警告", camp.warnings.length === 2 && camp.warnings[0].includes("運転した人が選ばれていません") && camp.warnings[1].includes("立て替えた人が選ばれていません"));
+check("運転者のない交通費・立て替えのない支出は警告", camp.warnings[0].includes("運転した人が選ばれていません") && camp.warnings[1].includes("立て替えた人が選ばれていません"));
+// ②のD・Eは高速だけでガソリンがない / ①のCはガソリンあり
+check("ガソリン代のない運転手は警告", camp.warnings.length === 4 && camp.warnings.slice(2).join() === "運転手 D のガソリン代が登録されていません（夏合宿まで）。,運転手 E のガソリン代が登録されていません（夏合宿まで）。");
 check("警告の支出は精算に入れない", camp.excluded === 1200 && camp.lines.find((l) => l.member.id === "A")!.paid === 5000);
 check("収支の合計がゼロ", camp.lines.reduce((s, l) => s + l.net, 0) === 0);
 const text = settlementText("合宿 精算", camp.lines);
